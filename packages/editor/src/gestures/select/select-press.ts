@@ -6,12 +6,13 @@
 import type { SceneLayer } from '@dazbee/renderer'
 import type { Point } from '@dazbee/schema'
 
+import { toggled } from '../../across-frames.ts'
 import { toWorld } from '../../canvas/camera.ts'
 import { type Frame, frameAt } from '../../canvas/frames.ts'
 import type { EditorView } from '../../canvas/view.ts'
 import type { EditorBoxes } from '../../layers/boxes.ts'
 import { localTo } from '../../layers/transform.ts'
-import type { EditorSelection, Picked } from '../../selection.ts'
+import { type EditorSelection, firstFrameOf, type Picked, samePick } from '../../selection.ts'
 import type { EditorTyping } from '../../text/typing.ts'
 import { CLICK_SLOP } from '../press.ts'
 import type { EditorAutoLayoutDrag, ReorderDrag } from './auto-layout-drag.ts'
@@ -24,8 +25,14 @@ export type SelectDrag = MoveDrag | ResizeDrag | RotateDrag | MarqueeDrag | Reor
 export interface SelectPressDeps {
   canvas: Pick<HTMLCanvasElement, 'setPointerCapture'>
   view: Pick<EditorView, 'camera' | 'design' | 'frames' | 'frameOf'>
-  selection: Pick<EditorSelection, 'current' | 'entered' | 'enter' | 'select' | 'selectKeepingModes' | 'pickFrame'>
-  boxes: Pick<EditorBoxes, 'selectionBox' | 'lockedSelection' | 'roots' | 'target' | 'lockedAt' | 'insideEntered'>
+  selection: Pick<
+    EditorSelection,
+    'current' | 'entered' | 'enter' | 'select' | 'selectAcross' | 'selectKeepingModes' | 'pickFrame'
+  >
+  boxes: Pick<
+    EditorBoxes,
+    'selectionBox' | 'selectionBoxes' | 'lockedSelection' | 'rootsByFrame' | 'target' | 'lockedAt' | 'insideEntered'
+  >
   typing: Pick<EditorTyping, 'stop'>
   transformDrag: Pick<EditorTransformDrag, 'handleUnder' | 'pressHandle' | 'pressMove'>
   autoLayoutDrag: Pick<EditorAutoLayoutDrag, 'press'>
@@ -84,8 +91,10 @@ export function editorSelectPress({
    * press there on nothing, which a click deselects.
    */
   let clickedAlone: string | null = null
+  /** The frame the press that may still be a click went down in. */
+  let pressedFrame: string | null = null
   /** The locked layer under a press that started a marquee: a click, with no drag, selects it. */
-  let lockedClick: { id: string; frameId: string } | null = null
+  let lockedClick: (Picked & { shift: boolean }) | null = null
   /** Where a press that may still be a click went down, on screen: it drags only once it has gone CLICK_SLOP from there. */
   let pressedAt: Point | null = null
   /** The text selected alone when the last press went down, and when the last run of clicks began. */
@@ -102,13 +111,16 @@ export function editorSelectPress({
     typing.stop()
     clickedAlone = null
     pressedAt = screen
+    pressedFrame = at?.frame.id ?? null
     const grabbed = transformDrag.handleUnder(screen)
-    const outer = boxes.selectionBox()
-    if (grabbed && outer && selection.current()) {
-      return transformDrag.pressHandle(e, screen, grabbed, outer)
+    const handled = boxes.selectionBox()
+    if (grabbed && handled && selection.current()) {
+      return transformDrag.pressHandle(e, screen, grabbed, handled)
     }
+    // The box round the selected layers of the frame pressed in, which a press inside drags.
+    const outer = boxes.selectionBoxes().find((b) => b.frame.id === at?.frame.id) ?? null
     const inSelection = (id: string) =>
-      selection.current()?.frameId === at?.frame.id && selection.current()?.ids.includes(id)
+      Boolean(at && selection.current()?.some((layer) => samePick(layer, { id, frameId: at.frame.id })))
     const locked = at && !e.shiftKey ? lockedAt(at.frame, at.p) : null
     // Inside the selection's box, a press moves the selection, gaps and layers over it included:
     // a mask, which isn't drawn, or a layer under others, is dragged where it is.
@@ -121,8 +133,6 @@ export function editorSelectPress({
       outer &&
       current &&
       movable &&
-      current.ids.length > 0 &&
-      outer.frame.id === at.frame.id &&
       inner.x >= outer.box.x &&
       inner.x <= outer.box.x + outer.box.width &&
       inner.y >= outer.box.y &&
@@ -138,17 +148,13 @@ export function editorSelectPress({
     const hit = at && deepest && !(locked && !inOuter) ? { id: target(deepest.id, at.frame.id) } : null
     if (at && hit) {
       if (e.shiftKey) {
-        // Shift adds a layer to the selection, or takes it out again.
-        if (inSelection(hit.id) && current) {
-          selection.select(
-            current.ids.filter((id) => id !== hit.id),
-            current.frameId,
-          )
-          return null
-        }
-        selection.select(current?.frameId === at.frame.id ? [...current.ids, hit.id] : [hit.id], at.frame.id)
+        // Shift adds a layer to the selection, or a linked copy of a selected one in another frame,
+        // or takes it out again.
+        const wasIn = inSelection(hit.id)
+        selection.selectAcross(toggled(current, { id: hit.id, frameId: at.frame.id }, view.design()))
+        if (wasIn) return null
       } else if (inSelection(hit.id)) {
-        if ((selection.current()?.ids.length ?? 0) > 1) clickedAlone = hit.id
+        if ((selection.current()?.length ?? 0) > 1) clickedAlone = hit.id
       } else if (inOuter) {
         clickedAlone = hit.id
       } else {
@@ -161,28 +167,40 @@ export function editorSelectPress({
       // Empty canvas, a frame's empty area, picked or not, or a locked layer: a marquee, adding to
       // the selection with Shift.
       canvas.setPointerCapture(e.pointerId)
-      lockedClick = at && locked ? { id: locked, frameId: at.frame.id } : null
+      // With Shift, the locked layer a click lands on is added or taken out once the press ends a click.
+      const under = at && (locked ?? (e.shiftKey ? lockedAt(at.frame, at.p) : null))
+      lockedClick = at && under ? { id: under, frameId: at.frame.id, shift: e.shiftKey } : null
       const from = toWorld(view.camera(), screen)
-      const base = e.shiftKey ? (selection.current()?.ids ?? []) : []
-      const baseFrame = e.shiftKey ? (selection.current()?.frameId ?? null) : null
+      const base = e.shiftKey ? (selection.current() ?? []) : []
       // A press on a locked layer keeps the selection until it is a drag, so a click on the one
       // selected leaves it be.
       if (!e.shiftKey && !locked) selection.selectKeepingModes(null)
       if (!(locked && insideEntered(locked))) selection.enter(null)
-      return { kind: 'marquee', from, to: from, base, baseFrame }
+      return { kind: 'marquee', from, to: from, base }
     } else if (!e.shiftKey) {
       clickedAlone = ''
     }
-    const frame = at && frameOf(selection.current()?.frameId)
-    const around = boxes.selectionBox()?.around ?? []
-    if (!at || !frame) return null
+    // The frame pressed in is dragged, when it holds selected layers, else the first one's; the
+    // selected layers of the other frames go with it.
+    const parts = boxes.rootsByFrame()
+    const dragged = parts.find((part) => part.frame.id === at?.frame.id) ?? parts[0]
+    const frame = at && dragged && frameOf(dragged.frame.id)
+    if (!at || !frame || !dragged) return null
+    const aroundIn = (frameId: string) => boxes.selectionBoxes().find((b) => b.frame.id === frameId)?.around ?? []
+    const around = aroundIn(frame.id)
     canvas.setPointerCapture(e.pointerId)
-    const ids = boxes.roots()
-    const reorder = autoLayoutDrag.press(frame, around, at.p, ids)
+    const others = parts.filter((part) => part !== dragged)
+    const reorder = others.length === 0 ? autoLayoutDrag.press(frame, around, at.p, dragged.ids) : null
     if (reorder) {
       return reorder
     }
-    return transformDrag.pressMove(frame, around, at.p, ids)
+    return transformDrag.pressMove(
+      frame,
+      around,
+      at.p,
+      dragged.ids,
+      others.map((part) => ({ ...part, around: aroundIn(part.frame.id) })),
+    )
   }
   function pressLabel(e: PointerEvent, screen: Point, frameId: string) {
     pressedText = textSelected()
@@ -209,7 +227,11 @@ export function editorSelectPress({
     const clicked =
       gesture?.kind === 'marquee' &&
       Math.hypot(gesture.to.x - gesture.from.x, gesture.to.y - gesture.from.y) * view.camera().zoom < CLICK_SLOP
-    if (clicked && lockedClick) selection.select([lockedClick.id], lockedClick.frameId)
+    if (clicked && lockedClick?.shift)
+      selection.selectAcross(
+        toggled(selection.current(), { id: lockedClick.id, frameId: lockedClick.frameId }, view.design()),
+      )
+    else if (clicked && lockedClick) selection.select([lockedClick.id], lockedClick.frameId)
     else if (gesture?.kind === 'marquee')
       selection.pickFrame(clicked && !selection.current() ? (frameAt(view.frames(), gesture.from)?.id ?? null) : null)
     lockedClick = null
@@ -217,13 +239,14 @@ export function editorSelectPress({
     if (clickedAlone !== null && current) {
       // A click that picks a layer outside the group gone into, or nothing, leaves it.
       if (selection.entered() && (!clickedAlone || !insideEntered(clickedAlone))) selection.enter(null)
-      selection.select(clickedAlone ? [clickedAlone] : [], current.frameId)
+      selection.select(clickedAlone ? [clickedAlone] : [], pressedFrame ?? firstFrameOf(current) ?? null)
       // A click inside the selection's box on no layer picks the frame there.
       if (!clickedAlone && pressedAt)
         selection.pickFrame(frameAt(view.frames(), toWorld(view.camera(), pressedAt))?.id ?? null)
     }
     clickedAlone = null
     pressedAt = null
+    pressedFrame = null
   }
   function cancel() {
     lockedClick = null
@@ -238,8 +261,8 @@ export function editorSelectPress({
   }
   function textSelected(): Picked | null {
     const current = selection.current()
-    const id = current?.ids.length === 1 ? current.ids[0] : undefined
-    return current && id && view.design().nodes[id]?.type === 'text' ? { id, frameId: current.frameId } : null
+    const only = current?.length === 1 ? current[0] : undefined
+    return only && view.design().nodes[only.id]?.type === 'text' ? only : null
   }
 
   return {

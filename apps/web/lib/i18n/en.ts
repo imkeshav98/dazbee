@@ -722,6 +722,7 @@ export const en = {
         booleanExclude: 'Exclude',
         copyStyle: 'Copy style',
         pasteStyle: 'Paste style',
+        selectLinkedCopies: 'Select linked copies in every frame',
         styleToLinked: 'Copy style to linked frames',
         textToLinked: 'Copy text to linked frames',
         lockLinked: 'Lock or unlock in all frames',

@@ -5,6 +5,7 @@ import { Design } from '@dazbee/schema'
 import type { Gesture } from '../gestures/pointer.ts'
 import type { Box } from '../layers/transform.ts'
 import type { Picked } from '../selection.ts'
+import { pairsIn } from '../selection.ts'
 import type { Frame } from './frames.ts'
 import { editorOverlay, type OverlayDeps } from './overlay.ts'
 import { design } from './test-design.ts'
@@ -80,6 +81,8 @@ function harness(
     insets?: { top: number; right: number; bottom: number; left: number }
     /** The design holds linked copies of the selected layer, and the story is in view too. */
     linked?: boolean
+    /** The MPU's copy is selected too. */
+    across?: boolean
   } = {},
 ) {
   const log: string[] = []
@@ -103,7 +106,10 @@ function harness(
       outline: (className) => fake(className) as unknown as HTMLElement,
     },
     selection: {
-      current: () => (state.selected === false ? null : { ids: ['a'], frameId: 'one-sq' }),
+      current: () =>
+        state.selected === false
+          ? null
+          : [...pairsIn('one-sq', ['a']), ...(state.across ? pairsIn('one-mpu', ['mpu-a']) : [])],
       entered: () => 'g',
       hovered: () => ({ id: 'h', frameId: 'one-sq' }),
       pickedFrame: () => (state.picked ? 'one-sq' : null),
@@ -116,6 +122,8 @@ function harness(
     boxes: {
       selectionBox: () =>
         state.selected === false ? null : { frame: SQUARE, box: BOX, drawn: BOX, around: [] as Box[] },
+      selectionBoxes: () =>
+        state.selected === false ? [] : [{ frame: SQUARE, box: BOX, drawn: BOX, around: [] as Box[] }],
       drawnBoxOf: () => BOX,
       handlesFor: () => ['nw'],
     },
@@ -225,6 +233,10 @@ describe('editorOverlay', () => {
       expect(drawn().filter((name) => name === 'linked-copy')).toHaveLength(1)
       expect(part('linked-copy')?.dataset).toEqual({ layer: 'story-a', frame: 'one-story' })
       expect(drawn().indexOf('linked-copy')).toBeLessThan(drawn().indexOf('selection'))
+      // A copy selected too has none, and the copy of both selected layers has one.
+      const across = harness({ linked: true, across: true })
+      across.overlay.draw()
+      expect(across.drawn().filter((name) => name === 'linked-copy')).toHaveLength(1)
       const none = harness({ linked: true, selected: false })
       none.overlay.draw()
       expect(none.drawn()).not.toContain('linked-copy')

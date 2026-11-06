@@ -1,198 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { render } from '@dazbee/renderer'
-import type { DesignInput } from '@dazbee/schema'
-
-import { type ActionsDeps, editorActions } from './actions.ts'
-import { type Frame, pageFrames } from './canvas/frames.ts'
-import { editorFrameActions } from './frame-actions.ts'
-import { editorAutoLayoutDrag } from './gestures/select/auto-layout-drag.ts'
-import { editorTransformDrag } from './gestures/select/transform-drag.ts'
-import { hug } from './layers/hug.ts'
-import { measure, sessionOf, testBoxes } from './layers/test-boxes.ts'
-import { editorSelection } from './selection.ts'
-
-const rect = (
-  parentId: string,
-  index: string,
-  box: { x: number; y: number; width: number; height: number },
-  extra: Record<string, unknown> = {},
-) => ({
-  type: 'graphic' as const,
-  parentId,
-  index,
-  name: 'Rect',
-  props: { ...box, shape: { kind: 'rect' as const }, ...extra },
-})
-/**
- * One page with a square frame and a wide one. The square holds three squares in a row with uneven
- * gaps, a layer locked in place, and a row laid out by auto layout holding one square; the wide
- * frame holds a copy of the first square.
- */
-const DESIGN: DesignInput = {
-  meta: { designId: 'd', name: 'D' },
-  pages: { p1: { name: 'One', order: 'a0' } },
-  frames: {
-    sq: { pageId: 'p1', name: 'Square', width: 1080, height: 1080, x: 0, y: 0, order: 'a0' },
-    wide: { pageId: 'p1', name: 'Wide', width: 1200, height: 628, x: 1280, y: 0, order: 'a1' },
-  },
-  nodes: {
-    a: { ...rect('sq', 'a0', { x: 100, y: 100, width: 100, height: 100 }), link: 'a' },
-    b: { ...rect('sq', 'a1', { x: 250, y: 300, width: 100, height: 100 }), link: 'b' },
-    c: { ...rect('sq', 'a2', { x: 700, y: 120, width: 100, height: 100 }), link: 'c' },
-    pin: { ...rect('sq', 'a3', { x: 700, y: 700, width: 50, height: 50 }), link: 'pin', lock: { move: true } },
-    row: {
-      type: 'box',
-      parentId: 'sq',
-      link: 'row',
-      index: 'a4',
-      name: 'Row',
-      props: { x: 100, y: 500, width: 300, height: 100, layout: { direction: 'row' } },
-    },
-    inRow: { ...rect('row', 'a0', { x: 0, y: 0, width: 50, height: 50 }), link: 'inRow' },
-    'wide-a': { ...rect('wide', 'a0', { x: 100, y: 100, width: 100, height: 100 }), link: 'a' },
-  },
-}
-const PADDED = (pad: number) => ({ top: pad, right: pad, bottom: pad, left: pad })
-/**
- * The design with a row laid out by auto layout lower in the square: a fixed square, a square that
- * fills the row's width, and a box hugging one square inside its padding, laid out by auto layout too.
- */
-const FLOW: DesignInput = {
-  ...DESIGN,
-  nodes: {
-    ...DESIGN.nodes,
-    flow: {
-      type: 'box',
-      parentId: 'sq',
-      link: 'flow',
-      index: 'a5',
-      name: 'Flow',
-      props: {
-        x: 40,
-        y: 800,
-        width: 560,
-        height: 160,
-        sizing: { width: 'fixed', height: 'hug' },
-        layout: { direction: 'row', gap: 20, padding: PADDED(20) },
-      },
-    },
-    fixed: { ...rect('flow', 'a0', { x: 0, y: 0, width: 120, height: 120 }), link: 'fixed' },
-    filling: {
-      ...rect('flow', 'a1', { x: 0, y: 0, width: 100, height: 120 }, { sizing: { width: 'fill', height: 'fixed' } }),
-      link: 'filling',
-    },
-    hugging: {
-      type: 'box',
-      parentId: 'flow',
-      link: 'hugging',
-      index: 'a2',
-      name: 'Hugging',
-      props: {
-        x: 0,
-        y: 0,
-        width: 10,
-        height: 10,
-        sizing: { width: 'hug', height: 'hug' },
-        layout: { direction: 'row', gap: 0, padding: PADDED(30) },
-      },
-    },
-    inHug: { ...rect('hugging', 'a0', { x: 0, y: 0, width: 60, height: 60 }), link: 'inHug' },
-  },
-}
-
-/** The actions on a real session, selection and drags over the page's frames, logging what they ask of the view, the tools and the pen. */
-function harness(penDrawing = false, design = DESIGN) {
-  const session = sessionOf(design)
-  const frames = pageFrames(session.design(), 'p1').frames
-  const [frame, wide] = frames as [Frame, Frame]
-  const log: string[] = []
-  const selection = editorSelection({ drawn: () => session.design(), frames: () => frames, changed: () => {} })
-  const boxes = testBoxes(session, selection, frames)
-  const scenes = { scene: (f: Frame) => render(session.design(), f.id, undefined, measure) }
-  const hugAll = (ids: string[]) => hug(session, ids)
-  const camera = () => ({ x: 0, y: 0, zoom: 1 })
-  const transformDrag = editorTransformDrag({
-    canvas: {} as HTMLCanvasElement,
-    session,
-    scenes,
-    selection,
-    typing: { editing: () => null, fitText: () => {} },
-    boxes,
-    camera,
-    frames: () => frames,
-    hug: hugAll,
-    notify: () => {},
-    placeBox: () => {},
-  })
-  const autoLayoutDrag = editorAutoLayoutDrag({
-    session,
-    boxes,
-    camera,
-    hug: hugAll,
-    notify: (notice) => log.push(notice),
-    outline: () => {
-      throw new Error('nothing is drawn in these tests')
-    },
-  })
-  const frameActions = editorFrameActions({
-    session,
-    view: {
-      page: () => 'p1',
-      showArea: (area) => log.push(`showArea ${JSON.stringify(area)}`),
-      showWhole: (area) => log.push(`showWhole ${JSON.stringify(area)}`),
-    },
-    tools: { setTool: (tool) => log.push(`tool ${tool}`) },
-    frameName: (width, height) => `Size ${width}×${height}`,
-    selection,
-    drawOverlay: () => log.push('overlay'),
-  })
-  const deps: ActionsDeps = {
-    session,
-    view: {
-      design: () => session.design(),
-      frameOf: (key) => frames.find((f) => f.id === key),
-      page: () => 'p1',
-      // The wide frame is in the middle of the view.
-      nearestFrame: () => wide,
-      fitAll: () => log.push('fitAll'),
-      fitArea: (area) => log.push(`fitArea ${JSON.stringify(area)}`),
-      zoomTo: (zoom) => log.push(`zoomTo ${zoom}`),
-      zoomIn: () => log.push('zoomIn'),
-      zoomOut: () => log.push('zoomOut'),
-      toggleRulers: () => log.push('toggleRulers'),
-      viewChanged: () => log.push('viewChanged'),
-    },
-    tools: { setTool: (tool) => log.push(`tool ${tool}`) },
-    selection,
-    scenes,
-    boxes,
-    pen: {
-      drawing: () => penDrawing,
-      finish: () => log.push('pen finish'),
-      deletePoints: () => (log.push('pen deletePoints'), true),
-    },
-    transformDrag,
-    autoLayoutDrag,
-    frameActions,
-    notify: (notice) => log.push(notice),
-    drawOverlay: () => log.push('overlay'),
-  }
-  const actions = editorActions(deps)
-  /** A layer's x and y. */
-  const at = (id: string) => {
-    const p = session.design().nodes[id]?.props as { x: number; y: number }
-    return { x: p.x, y: p.y }
-  }
-  /** Where each layer of the square is drawn, by id. */
-  const drawn = () =>
-    Object.fromEntries(
-      Object.keys(session.design().nodes)
-        .filter((id) => session.design().nodes[id]?.parentId !== 'wide')
-        .map((id) => [id, boxes.drawnBoxOf(frame, id)]),
-    )
-  return { actions, frameActions, session, selection, frame, wide, log, at, drawn }
-}
+import { idsOf, pairsIn } from './selection.ts'
+import { FLOW, harness } from './test-actions.ts'
 
 describe('editorActions', () => {
   describe('perform', () => {
@@ -244,7 +53,7 @@ describe('editorActions', () => {
       const { actions, session, selection, frame } = harness()
       selection.select(['a', 'b'], frame.id)
       actions.perform('group')
-      const [group] = selection.current()?.ids ?? []
+      const [group] = idsOf(selection.current())
       expect(session.design().nodes[group ?? '']?.type).toBe('group')
       expect(session.design().nodes.a?.parentId).toBe(group)
     })
@@ -256,7 +65,7 @@ describe('editorActions', () => {
       expect(session.design().nodes.row).toBeUndefined()
       expect(session.design().nodes.inRow?.parentId).toBe('sq')
       expect(at('inRow')).toEqual({ x: 100, y: 500 })
-      expect(selection.current()?.ids).toEqual(['inRow'])
+      expect(idsOf(selection.current())).toEqual(['inRow'])
       session.undo()
       expect(session.design().nodes.inRow?.parentId).toBe('row')
     })
@@ -272,7 +81,7 @@ describe('editorActions', () => {
       expect(session.design().nodes.hugging).toBeDefined()
       expect(log).not.toContain('placedByLayout')
       expect(session.canUndo()).toBe(false)
-      expect(selection.current()?.ids).toEqual(['hugging'])
+      expect(idsOf(selection.current())).toEqual(['hugging'])
     })
 
     it('ungroups a group in a flow when what it held takes its place there, nothing moving', () => {
@@ -280,7 +89,7 @@ describe('editorActions', () => {
       const before = drawn()
       selection.select(['fixed', 'filling'], frame.id)
       actions.perform('group')
-      const [group = ''] = selection.current()?.ids ?? []
+      const [group = ''] = idsOf(selection.current())
       expect(drawn()).toMatchObject(before)
       expect(actions.perform('ungroup')).toBe(true)
       expect(session.design().nodes[group]).toBeUndefined()
@@ -329,6 +138,106 @@ describe('editorActions', () => {
       expect(at('inRow')).toEqual({ x: 0, y: 0 })
     })
 
+    describe('across frames', () => {
+      it("selects the linked copies of the selection in the page's other frames, after it", () => {
+        const { actions, selection, frame, wide } = harness()
+        expect(actions.perform('selectLinkedCopies')).toBe(false)
+        selection.select(['a', 'b'], frame.id)
+        expect(actions.perform('selectLinkedCopies')).toBe(true)
+        expect(selection.current()).toEqual([...pairsIn(frame.id, ['a', 'b']), ...pairsIn(wide.id, ['wide-a'])])
+        // Again, nothing more to add.
+        actions.perform('selectLinkedCopies')
+        expect(selection.current()).toEqual([...pairsIn(frame.id, ['a', 'b']), ...pairsIn(wide.id, ['wide-a'])])
+      })
+
+      it('nudges every copy by the same amount, each press one undo step', () => {
+        const { actions, session, selection, frame, wide, at } = harness()
+        selection.selectAcross([...pairsIn(frame.id, ['a']), ...pairsIn(wide.id, ['wide-a'])])
+        actions.perform('nudgeRight')
+        actions.perform('nudgeDownFar')
+        expect(at('a')).toEqual({ x: 101, y: 110 })
+        expect(at('wide-a')).toEqual({ x: 101, y: 110 })
+        session.undo()
+        expect(at('a')).toEqual({ x: 101, y: 100 })
+        expect(at('wide-a')).toEqual({ x: 101, y: 100 })
+        session.redo()
+        expect(at('wide-a')).toEqual({ x: 101, y: 110 })
+      })
+
+      it('deletes the selected layers in every frame as one undo step', () => {
+        const { actions, session, selection, frame, wide } = harness()
+        selection.selectAcross([...pairsIn(frame.id, ['a', 'b']), ...pairsIn(wide.id, ['wide-a'])])
+        expect(actions.perform('delete')).toBe(true)
+        expect(['a', 'b', 'wide-a'].map((id) => session.design().nodes[id])).toEqual([undefined, undefined, undefined])
+        expect(selection.current()).toBeNull()
+        session.undo()
+        expect(['a', 'b', 'wide-a'].every((id) => session.design().nodes[id])).toBe(true)
+      })
+
+      it("groups each frame's selected layers in that frame, as one undo step, selecting every group", () => {
+        const { actions, session, selection, frame, wide } = harness()
+        selection.selectAcross([...pairsIn(frame.id, ['a', 'b']), ...pairsIn(wide.id, ['wide-a'])])
+        actions.perform('group')
+        const groups = selection.current() ?? []
+        expect(groups.map((layer) => layer.frameId)).toEqual([frame.id, wide.id])
+        const nodes = session.design().nodes
+        expect(groups.map((layer) => nodes[layer.id]?.type)).toEqual(['group', 'group'])
+        expect([nodes.a?.parentId, nodes.b?.parentId, nodes['wide-a']?.parentId]).toEqual([
+          groups[0]?.id,
+          groups[0]?.id,
+          groups[1]?.id,
+        ])
+        session.undo()
+        expect(session.design().nodes['wide-a']?.parentId).toBe(wide.id)
+        expect(session.design().nodes.a?.parentId).toBe(frame.id)
+      })
+
+      it("lines up each frame's layers in that frame, as one undo step", () => {
+        const { actions, session, selection, frame, wide, at } = harness()
+        selection.selectAcross([...pairsIn(frame.id, ['a', 'c']), ...pairsIn(wide.id, ['wide-a'])])
+        actions.perform('alignRight')
+        expect(at('a')).toEqual({ x: 700, y: 100 })
+        // One layer lines up with its frame.
+        expect(at('wide-a')).toEqual({ x: 1100, y: 100 })
+        session.undo()
+        expect([at('a'), at('wide-a')]).toEqual([
+          { x: 100, y: 100 },
+          { x: 100, y: 100 },
+        ])
+      })
+
+      it("keeps a frame's layers selected when its change selects nothing new: one layer masks, several are grouped", () => {
+        const { actions, session, selection, frame, wide } = harness()
+        selection.selectAcross([...pairsIn(frame.id, ['a', 'b']), ...pairsIn(wide.id, ['wide-a'])])
+        actions.perform('mask')
+        const [group, ...rest] = selection.current() ?? []
+        expect(session.design().nodes[group?.id ?? '']?.type).toBe('group')
+        expect(rest).toEqual(pairsIn(wide.id, ['wide-a']))
+        expect(session.design().nodes['wide-a']?.props.mask).toBe('alpha')
+      })
+
+      it('moves the copies a lock leaves free, the one locked in place staying', () => {
+        const { actions, session, selection, frame, wide, at } = harness()
+        session.run('node.lock', { ids: ['a'], lock: { move: true } })
+        selection.selectAcross([...pairsIn(wide.id, ['wide-a']), ...pairsIn(frame.id, ['a'])])
+        actions.perform('nudgeRight')
+        expect([at('wide-a'), at('a')]).toEqual([
+          { x: 101, y: 100 },
+          { x: 100, y: 100 },
+        ])
+      })
+
+      it('duplicates the selected layers in their own frames, selecting the new ones', () => {
+        const { actions, session, selection, frame, wide } = harness()
+        selection.selectAcross([...pairsIn(frame.id, ['a']), ...pairsIn(wide.id, ['wide-a'])])
+        actions.perform('duplicate')
+        const copies = selection.current() ?? []
+        expect(copies.map((layer) => layer.frameId)).toEqual([frame.id, wide.id])
+        expect(copies.map((layer) => session.design().nodes[layer.id]?.parentId)).toEqual([frame.id, wide.id])
+        expect(copies.some((layer) => ['a', 'wide-a'].includes(layer.id))).toBe(false)
+      })
+    })
+
     it('nudges by a pixel, or ten with Shift, each press one undo step', () => {
       const { actions, session, selection, frame, at } = harness()
       selection.select(['a'], frame.id)
@@ -349,14 +258,14 @@ describe('editorActions', () => {
     it("selects every top-level layer that can be picked of the selection's frame, else of the frame last selected in on the page, else of the frame nearest the middle of the view", () => {
       const { actions, selection, frame, wide } = harness()
       actions.perform('selectAll')
-      expect(selection.current()).toEqual({ frameId: wide.id, ids: ['wide-a'] })
+      expect(selection.current()).toEqual(pairsIn(wide.id, ['wide-a']))
       selection.select(['a'], frame.id)
       selection.select([], frame.id)
       actions.perform('selectAll')
-      expect(selection.current()).toEqual({ frameId: frame.id, ids: ['a', 'b', 'c', 'row'] })
+      expect(selection.current()).toEqual(pairsIn(frame.id, ['a', 'b', 'c', 'row']))
       selection.select(['wide-a'], wide.id)
       actions.perform('selectAll')
-      expect(selection.current()).toEqual({ frameId: wide.id, ids: ['wide-a'] })
+      expect(selection.current()).toEqual(pairsIn(wide.id, ['wide-a']))
     })
 
     it('locks the selected layers, then unlocks them when every one is locked', () => {
@@ -375,7 +284,7 @@ describe('editorActions', () => {
       actions.perform('hide')
       expect(session.design().nodes.a?.props.visible).toBe(false)
       expect(session.design().nodes['wide-a']).toEqual(copy)
-      expect(selection.current()?.ids).toEqual(['a'])
+      expect(idsOf(selection.current())).toEqual(['a'])
       actions.perform('hide')
       expect(session.design().nodes.a?.props.visible).toBe(true)
     })
@@ -446,7 +355,7 @@ describe('editorActions', () => {
       const { actions, selection, frame } = harness()
       selection.pickFrame(frame.id)
       actions.perform('selectAll')
-      expect(selection.current()).toEqual({ frameId: frame.id, ids: ['a', 'b', 'c', 'row'] })
+      expect(selection.current()).toEqual(pairsIn(frame.id, ['a', 'b', 'c', 'row']))
       expect(selection.pickedFrame()).toBeNull()
     })
 
@@ -491,7 +400,7 @@ describe('editorActions', () => {
       const { actions, session, selection, frame, log } = harness(false, FLOW)
       selection.select(['fixed', 'filling'], frame.id)
       actions.perform('group')
-      const [group = ''] = selection.current()?.ids ?? []
+      const [group = ''] = idsOf(selection.current())
       session.run('node.lock', { ids: [group, 'row'], lock: { delete: true } })
       for (const id of [group, 'row']) {
         selection.select([id], frame.id)
@@ -506,7 +415,7 @@ describe('editorActions', () => {
       const { actions, session, selection, frame, log } = harness(false, FLOW)
       selection.select(['fixed', 'filling'], frame.id)
       actions.perform('group')
-      const [group = ''] = selection.current()?.ids ?? []
+      const [group = ''] = idsOf(selection.current())
       session.run('node.lock', { ids: ['row'], lock: { delete: true } })
       selection.select([group, 'row'], frame.id)
       expect(actions.ungroupState()).toBe('ready')

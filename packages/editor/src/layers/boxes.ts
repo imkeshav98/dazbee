@@ -6,13 +6,14 @@ import { ancestorsOf, childrenOf, frameIdOf, type Session } from '@dazbee/doc'
 import { render, type SceneLayer } from '@dazbee/renderer'
 import { canHold, type Design, type ImagePaint, type Paint, pathScale, type Point, type Rect } from '@dazbee/schema'
 
+import { byFrame } from '../across-frames.ts'
 import type { Frame } from '../canvas/frames.ts'
 import type { HitOptions } from '../canvas/hit-test.ts'
 import { findLayer, type FrameScenes } from '../canvas/scenes.ts'
 import { coverCrop, imageRect, type Size } from '../gestures/crop/crop.ts'
 import { offsetPath, parsePath, type PenPath, scalePath } from '../gestures/pen/path.ts'
 import type { EditorResources } from '../resources.ts'
-import type { EditorSelection } from '../selection.ts'
+import { type EditorSelection, firstFrameOf, idsOf } from '../selection.ts'
 import { laidOut, placedInside, propIn } from './auto-layout.ts'
 import { boundsOf, type Box, centreOf, drawnFrom, type Handle, HANDLES, normalAngle, turn } from './transform.ts'
 
@@ -66,10 +67,17 @@ export interface EditorBoxes {
   drawnContains(frame: Frame, id: string, p: Point, from: Design): boolean
   /** The boxes a transform of layers changes, as they are now: the layers and those under them that no flow places. */
   startBoxes(frame: Frame, ids: string[]): Map<string, Box>
-  /** The box the selection's handles go on, with where it is drawn and its containers; null with nothing selected. */
+  /**
+   * The box the selection's handles go on, round the selected layers in the first one's frame, with
+   * where it is drawn and its containers; null with nothing selected.
+   */
   selectionBox(): SelectionBox | null
+  /** The box round the selected layers in each frame of the shown page that holds some, the first one's frame first. */
+  selectionBoxes(): SelectionBox[]
   /** The selected layers that aren't inside another selected one: the ones a transform moves. */
   roots(from?: Design): string[]
+  /** The selected layers a transform moves, split by their frame on the shown page, the first one's frame first. */
+  rootsByFrame(from?: Design): { frame: Frame; ids: string[] }[]
   /** Whether a layer can be gathered by select all or a marquee: it isn't locked in place. */
   pickable(layer: SceneLayer): boolean
   /** Whether the selection is locked in place: it shows no handles and a press can't move it. */
@@ -162,18 +170,20 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
   /** Locked in place layers are left out where layers are gathered: select all and a marquee. */
   const pickable = (layer: SceneLayer) => !drawn().nodes[layer.id]?.lock?.move
   /** Whether the selection is locked in place: it shows no handles and a press can't move it. */
-  const lockedSelection = () => Boolean(selection.current()?.ids.some((id) => drawn().nodes[id]?.lock?.move))
+  const lockedSelection = () => idsOf(selection.current()).some((id) => drawn().nodes[id]?.lock?.move)
   /**
-   * The handles the selection has: none while it is locked in place; one text that grows with its
+   * The handles the selection has: none while it is locked in place, or spans several frames, where
+   * only a move, the arrows and the panels change every copy alike; one text that grows with its
    * words has no top or bottom ones, since only a fixed box has a height of its own.
    */
   function handlesFor(): readonly Handle[] {
     const current = selection.current()
-    const frame = frameOf(current?.frameId)
-    if (!current || !frame || lockedSelection()) return []
-    const [only] = current.ids
+    const frame = frameOf(firstFrameOf(current))
+    if (!current || !frame || lockedSelection() || byFrame(current).length > 1) return []
+    const ids = idsOf(current)
+    const [only] = ids
     if (
-      current.ids.length === 1 &&
+      ids.length === 1 &&
       only &&
       drawn().nodes[only]?.type === 'text' &&
       propIn(only, 'boxMode', drawn()) !== 'fixed'
@@ -184,9 +194,17 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
 
   /** Selected layers that aren't inside another selected layer: the ones a transform moves. */
   function roots(from: Design = session.design()) {
-    const ids = selection.current()?.ids ?? []
+    const ids = idsOf(selection.current())
     const inside = (id: string) => ancestorsOf(from, from.nodes[id]?.parentId ?? '').some((up) => ids.includes(up))
     return ids.filter((id) => from.nodes[id] && !inside(id))
+  }
+  function rootsByFrame(from: Design = session.design()) {
+    const all = roots(from)
+    return byFrame(selection.current()).flatMap(({ frameId, ids }) => {
+      const frame = frameOf(frameId)
+      const inFrame = ids.filter((id) => all.includes(id))
+      return frame && inFrame.length > 0 ? [{ frame, ids: inFrame }] : []
+    })
   }
   /**
    * The boxes a transform changes: each root and every layer under it, as they are now. A layer
@@ -206,15 +224,18 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
   }
   /** The box the handles go on, with where it is drawn and its containers. */
   function selectionBox(): SelectionBox | null {
-    const current = selection.current()
-    const frame = current && frameOf(current.frameId)
-    if (!frame || !current) return null
+    return selectionBoxes()[0] ?? null
+  }
+  function selectionBoxes(): SelectionBox[] {
     const now = session.design()
-    const boxes = current.ids.map((id) => boxIn(frame, id, now)).filter((b): b is Box => b !== null)
-    if (boxes.length === 0) return null
-    const box = boxes.length === 1 ? (boxes[0] as Box) : boundsOf(boxes)
-    const around = containersOf(frame, now.nodes[current.ids[0] ?? '']?.parentId, now)
-    return { frame, box, drawn: drawnFrom(box, around), around }
+    return byFrame(selection.current()).flatMap(({ frameId, ids }) => {
+      const frame = frameOf(frameId)
+      const boxes = frame ? ids.map((id) => boxIn(frame, id, now)).filter((b): b is Box => b !== null) : []
+      if (!frame || boxes.length === 0) return []
+      const box = boxes.length === 1 ? (boxes[0] as Box) : boundsOf(boxes)
+      const around = containersOf(frame, now.nodes[ids[0] ?? '']?.parentId, now)
+      return [{ frame, box, drawn: drawnFrom(box, around), around }]
+    })
   }
 
   /**
@@ -363,7 +384,7 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
    * be undone; a drag from it draws a marquee and moves nothing, it or what lies beneath.
    */
   function pickAt(frame: Frame, p: Point, options: HitOptions = {}) {
-    return scenes.hit(frame, p, { ...options, selected: selection.current()?.ids })
+    return scenes.hit(frame, p, { ...options, selected: idsOf(selection.current()) })
   }
   function lockedAt(frame: Frame, p: Point): string | null {
     const top = pickAt(frame, p)
@@ -377,8 +398,8 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
    */
   function target(hitId: string, frame: string) {
     const chain = ancestorsOf(drawn(), hitId)
-    const current = selection.current()
-    const selected = current?.frameId === frame ? chain.find((id) => current?.ids.includes(id)) : undefined
+    const inFrame = (selection.current() ?? []).filter((layer) => layer.frameId === frame).map((layer) => layer.id)
+    const selected = chain.find((id) => inFrame.includes(id))
     const entered = selection.entered()
     const at = entered ? chain.indexOf(entered) : -1
     return selected ?? (at > 0 ? chain[at - 1] : chain.at(-1)) ?? hitId
@@ -400,7 +421,9 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
     drawnContains,
     startBoxes,
     selectionBox,
+    selectionBoxes,
     roots,
+    rootsByFrame,
     pickable,
     lockedSelection,
     handlesFor,

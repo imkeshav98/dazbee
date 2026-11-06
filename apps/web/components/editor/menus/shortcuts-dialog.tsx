@@ -64,7 +64,7 @@ const GROUPS: [Group, Listed[]][] = [
     ],
   ],
   ['combine', ['booleanUnion', 'booleanSubtract', 'booleanIntersect', 'booleanExclude']],
-  ['linked', ['styleToLinked', 'textToLinked', 'lockLinked', 'hideLinked']],
+  ['linked', ['selectLinkedCopies', 'styleToLinked', 'textToLinked', 'lockLinked', 'hideLinked']],
   [
     'move',
     ['nudgeLeft', 'nudgeRight', 'nudgeUp', 'nudgeDown', 'nudgeLeftFar', 'nudgeRightFar', 'nudgeUpFar', 'nudgeDownFar'],

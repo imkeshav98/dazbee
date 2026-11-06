@@ -121,7 +121,7 @@ export const order = async (page: Page, frameId = 'sq') =>
     .sort(([a, x], [b, y]) => (x.index < y.index ? -1 : x.index > y.index ? 1 : a < b ? -1 : 1))
     .map(([id]) => id)
 
-/** Selects layers through the page's editor, in the frame of the first, then waits as the options say. */
+/** Selects layers through the page's editor, in the frames of the first one's page, then waits as the options say. */
 export async function selectLayers(page: Page, ids: string[], { bar = false, card }: SelectLayers = {}) {
   await page.evaluate((ids) => window.dazbee?.select(ids), ids)
   if ((bar || card) && ids.length > 0)

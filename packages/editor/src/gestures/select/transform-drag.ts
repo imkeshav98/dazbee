@@ -27,9 +27,11 @@ import {
   boxAt,
   centreOf,
   cornersOf,
+  frameStep,
   type Handle,
   handleAt,
   isCorner,
+  localStep,
   localTo,
   normalAngle,
   resize as resizeBox,
@@ -38,19 +40,27 @@ import {
   turn,
 } from '../../layers/transform.ts'
 import { runQuietly } from '../../run-quietly.ts'
-import type { EditorSelection } from '../../selection.ts'
+import type { EditorSelection, Selection } from '../../selection.ts'
 import type { EditorTyping } from '../../text/typing.ts'
 import { HANDLE_REACH, HANDLE_SIZE } from '../press.ts'
 
-/** A drag moving the selection, from the press until it ends: one undo step. */
-export interface MoveDrag {
-  kind: 'move'
+/** The selected layers of one frame a move carries, inside their containers there, and their boxes as the drag began. */
+export interface MovePart {
   frame: Frame
   around: Box[]
-  from: Point
   roots: string[]
   boxes: Map<string, Box>
+}
+/**
+ * A drag moving the selection, from the press until it ends: one undo step. The frame pressed in
+ * is dragged and snaps; `copies` holds the selected layers of the other frames, moved by the same
+ * amount.
+ */
+export interface MoveDrag extends MovePart {
+  kind: 'move'
+  from: Point
   targets: Targets | null
+  copies: MovePart[]
   end: () => void
 }
 /** A drag of one of the selection's handles, from the press until it ends: one undo step. */
@@ -87,8 +97,7 @@ export interface MarqueeDrag {
   kind: 'marquee'
   from: Point
   to: Point
-  base: string[]
-  baseFrame: string | null
+  base: Selection
 }
 /** A drag that moves, resizes or turns layers. */
 export type TransformDrag = MoveDrag | ResizeDrag | RotateDrag
@@ -101,10 +110,7 @@ export interface TransformDragDeps {
   scenes: Pick<FrameScenes, 'scene'>
   selection: Pick<EditorSelection, 'current' | 'pathEditing' | 'selectKeepingModes'>
   typing: Pick<EditorTyping, 'editing' | 'fitText'>
-  boxes: Pick<
-    EditorBoxes,
-    'boxIn' | 'startBoxes' | 'pickable' | 'roots' | 'selectionBox' | 'lockedSelection' | 'handlesFor' | 'snapBoxes'
-  >
+  boxes: Pick<EditorBoxes, 'boxIn' | 'startBoxes' | 'pickable' | 'roots' | 'selectionBox' | 'handlesFor' | 'snapBoxes'>
   camera: () => Camera
   /** The shown page's frames as last drawn. */
   frames: () => Frame[]
@@ -129,8 +135,18 @@ export interface EditorTransformDrag {
   parts(marquee: MarqueeDrag | null): HTMLElement[]
   /** A press on a handle the selection's box `outer` has: a drag that resizes or turns it, one undo step until it is released. */
   pressHandle(e: PointerEvent, screen: Point, grabbed: Grab, outer: SelectionBox): ResizeDrag | RotateDrag
-  /** A press that moves layers: a drag of those no flow places, one undo step until it is released; the app hears when some are. */
-  pressMove(frame: Frame, around: Box[], p: Point, ids: string[]): MoveDrag
+  /**
+   * A press that moves layers in a frame and, by the same amount, the selected layers of other
+   * frames: a drag of those no flow places, one undo step until it is released; the app hears when
+   * some are.
+   */
+  pressMove(
+    frame: Frame,
+    around: Box[],
+    p: Point,
+    ids: string[],
+    others?: { frame: Frame; around: Box[]; ids: string[] }[],
+  ): MoveDrag
   /** Follows the pointer: Shift keeps a move to one axis, a resize to its shape, a turn to 15° steps; Alt resizes about the centre. */
   drag(g: TransformDrag, p: Point, shift: boolean, alt: boolean, snap: boolean): void
   /** Writes new boxes: what changed from `start`, and what a gesture changed and put back. */
@@ -152,7 +168,7 @@ export function editorTransformDrag({
   scenes,
   selection,
   typing,
-  boxes: { boxIn, startBoxes, pickable, roots, selectionBox, lockedSelection, handlesFor, snapBoxes },
+  boxes: { boxIn, startBoxes, pickable, roots, selectionBox, handlesFor, snapBoxes },
   camera,
   frames,
   hug,
@@ -181,7 +197,8 @@ export function editorTransformDrag({
   /** The handle under a screen point: one to resize by, or the zone outside a corner to turn by. */
   function handleUnder(screen: Point): Grab | null {
     const outer = selectionBox()
-    if (!outer || typing.editing() || selection.pathEditing() || lockedSelection()) return null
+    // A selection with no handles, locked in place or across frames, has no turning zones either.
+    if (!outer || typing.editing() || selection.pathEditing() || handlesFor().length === 0) return null
     const { frame, drawn: box } = outer
     const onScreen = (p: Point) => toScreen(camera(), { x: frame.x + p.x, y: frame.y + p.y })
     const c = centreOf(box)
@@ -303,11 +320,18 @@ export function editorTransformDrag({
     }
   }
   /** A press that moves the selection: a drag of the layers no flow places, one undo step. */
-  function pressMove(frame: Frame, around: Box[], p: Point, ids: string[]): MoveDrag {
+  function pressMove(
+    frame: Frame,
+    around: Box[],
+    p: Point,
+    ids: string[],
+    others: { frame: Frame; around: Box[]; ids: string[] }[] = [],
+  ): MoveDrag {
     const now = session.design()
     // Layers in a flow among others stay in it: auto layout places them.
-    const free = ids.filter((id) => !inFlow(id, now))
-    if (free.length < ids.length) notify('placedByLayout')
+    const freeOf = (of: string[]) => of.filter((id) => !inFlow(id, now))
+    const free = freeOf(ids)
+    if ([ids, ...others.map((o) => o.ids)].some((of) => freeOf(of).length < of.length)) notify('placedByLayout')
     return {
       kind: 'move',
       frame,
@@ -316,6 +340,12 @@ export function editorTransformDrag({
       roots: free,
       boxes: startBoxes(frame, free),
       targets: targetsFor(frame, free, around),
+      copies: others.map((o) => ({
+        frame: o.frame,
+        around: o.around,
+        roots: freeOf(o.ids),
+        boxes: startBoxes(o.frame, freeOf(o.ids)),
+      })),
       end: session.beginGesture(),
     }
   }
@@ -362,8 +392,13 @@ export function editorTransformDrag({
       }
       snapped = { frame: g.frame, guides: s.guides, gaps: s.gaps }
     }
-    const next = new Map([...g.boxes].map(([id, b]) => [id, { ...b, x: toX(b.x + dx), y: toY(b.y + dy) }]))
+    const next = new Map([...g.boxes].map(([id, b]) => [id, moveBy(b, { x: dx, y: dy }, toX, toY)]))
     writeBoxes(g.frame, g.boxes, next)
+    // The other frames' layers go the same way across their frames, inside whatever turns them there.
+    for (const copy of g.copies) {
+      const step = localStep(frameStep({ x: dx, y: dy }, g.around), copy.around)
+      writeBoxes(copy.frame, copy.boxes, new Map([...copy.boxes].map(([id, b]) => [id, moveBy(b, step, toX, toY)])))
+    }
   }
   /** Resizes the layers by the handle dragged, snapping its edges, scaling the text a corner scales. */
   function resizeTo(g: ResizeDrag, p: Point, keepRatio: boolean, fromCentre: boolean, snap: boolean) {
@@ -512,16 +547,14 @@ export function editorTransformDrag({
       .scene(frame)
       .layers.filter((layer) => pickable(layer) && intersects(boundsOf([{ ...layer.props }]), local))
       .map((layer) => layer.id)
-    const base = g.baseFrame === frame.id ? g.base : []
-    selection.selectKeepingModes(
-      hits.length + base.length > 0
-        ? { frameId: frame.id, ids: [...base, ...hits.filter((id) => !base.includes(id))] }
-        : null,
-    )
+    // What was selected stays when some of it is in the marquee's frame, as Shift and a click there keep it.
+    const base = g.base.some((layer) => layer.frameId === frame.id) ? g.base : []
+    const added = hits.filter((id) => !base.some((layer) => layer.id === id)).map((id) => ({ id, frameId: frame.id }))
+    selection.selectKeepingModes(added.length + base.length > 0 ? [...base, ...added] : null)
   }
   /** Ends a move, resize or turn: the groups around the layers fit them again, closing its undo step. */
   function release(g: TransformDrag) {
-    hug(g.roots)
+    hug(g.kind === 'move' ? [g.roots, ...g.copies.map((copy) => copy.roots)].flat() : g.roots)
     g.end()
   }
 
@@ -544,6 +577,11 @@ export function carried(g: { kind: string } | null): { frame: Frame; roots: stri
   if (g?.kind !== 'move' && g?.kind !== 'resize' && g?.kind !== 'rotate') return null
   const { frame, roots } = g as TransformDrag
   return { frame, roots }
+}
+
+/** A box moved by a step, its place landing where `toX` and `toY` put it. */
+function moveBy(b: Box, step: Point, toX: (n: number) => number, toY: (n: number) => number): Box {
+  return { ...b, x: toX(b.x + step.x), y: toY(b.y + step.y) }
 }
 
 /** The sizes a run's style sets, which a corner scales: its font size, letter spacing and outline. */

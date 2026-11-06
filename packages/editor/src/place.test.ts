@@ -6,7 +6,7 @@ import { type DesignInput, LAYER_CLIPBOARD_TYPE } from '@dazbee/schema'
 import { type Frame, frameAt, pageFrames } from './canvas/frames.ts'
 import { sessionOf, testBoxes } from './layers/test-boxes.ts'
 import { editorPlace, type PlaceDeps } from './place.ts'
-import { editorSelection } from './selection.ts'
+import { editorSelection, firstFrameOf, idsOf, pairsIn } from './selection.ts'
 
 const ck = await loadCanvasKit()
 
@@ -258,7 +258,7 @@ describe('editorPlace', () => {
       const e = clipboardEvent(data)
       place.paste(e, () => null)
       expect(e.taken).toBe(true)
-      const [pasted] = selection.current()?.ids ?? []
+      const [pasted] = idsOf(selection.current())
       expect(pasted).toBeDefined()
       expect(pasted).not.toBe('a')
       expect(boxOf(pasted ?? '')).toEqual(boxOf('a'))
@@ -277,7 +277,7 @@ describe('editorPlace', () => {
       place.copy(clipboardEvent(data))
       selection.select(['wide-words'], wide.id)
       place.paste(clipboardEvent(data), () => null)
-      const pasted = selection.current()?.ids ?? []
+      const pasted = idsOf(selection.current())
       const links = pasted.map((id) => session.design().nodes[id]?.link)
       // The wide frame lacks the square's first square, so its copy is linked; it holds the line already.
       expect(links[0]).toBe('a')
@@ -296,12 +296,12 @@ describe('editorPlace', () => {
       session.run('node.delete', { ids: ['a'] })
       selection.select(['words'], square.id)
       place.paste(clipboardEvent(data), () => null)
-      const [own] = selection.current()?.ids ?? []
+      const [own] = idsOf(selection.current())
       expect(session.design().nodes[own ?? '']?.link).not.toBe('a')
       const other = JSON.stringify({ ...JSON.parse(data.getData(LAYER_CLIPBOARD_TYPE)), designId: 'other' })
       selection.select(['wide-words'], wide.id)
       place.paste(clipboardEvent(transfer({ [LAYER_CLIPBOARD_TYPE]: other })), () => null)
-      const [fromOther] = selection.current()?.ids ?? []
+      const [fromOther] = idsOf(selection.current())
       expect(session.design().nodes[fromOther ?? '']?.link).not.toBe('a')
     })
 
@@ -312,11 +312,11 @@ describe('editorPlace', () => {
       place.copy(clipboardEvent(data))
       place.aimPaste(true)
       place.paste(clipboardEvent(data), () => client(square, 600, 600))
-      const [centred] = selection.current()?.ids ?? []
+      const [centred] = idsOf(selection.current())
       expect(boxOf(centred ?? '')).toMatchObject({ x: 550, y: 550 })
       place.aimPaste(false)
       place.paste(clipboardEvent(data), () => client(square, 600, 600))
-      const [inPlace] = selection.current()?.ids ?? []
+      const [inPlace] = idsOf(selection.current())
       expect(boxOf(inPlace ?? '')).toMatchObject({ x: 100, y: 100 })
     })
 
@@ -325,8 +325,8 @@ describe('editorPlace', () => {
       const e = clipboardEvent(transfer({ 'text/plain': SVG }))
       place.paste(e, () => null)
       expect(e.taken).toBe(true)
-      const [group] = selection.current()?.ids ?? []
-      expect(selection.current()?.frameId).toBe(wide.id)
+      const [group] = idsOf(selection.current())
+      expect(firstFrameOf(selection.current())).toBe(wide.id)
       expect(session.design().nodes[group ?? '']?.type).toBe('group')
     })
 
@@ -371,7 +371,7 @@ describe('editorPlace', () => {
       expect(place.copyLayers()).toBe(true)
       expect(place.canPasteLayers()).toBe(true)
       expect(place.pasteLayers(() => null)).toBe(true)
-      const [pasted] = selection.current()?.ids ?? []
+      const [pasted] = idsOf(selection.current())
       expect(pasted).not.toBe('a')
       expect(boxOf(pasted ?? '')).toEqual(boxOf('a'))
     })
@@ -384,14 +384,14 @@ describe('editorPlace', () => {
       expect(id).not.toBeNull()
       expect(session.design().nodes[id ?? '']).toMatchObject({ type: 'group', name: 'Logo', parentId: 'sq' })
       expect(boxOf(id ?? '')).toEqual({ x: 450, y: 475, width: 100, height: 50 })
-      expect(selection.current()).toEqual({ ids: [id], frameId: square.id })
+      expect(selection.current()).toEqual(pairsIn(square.id, [id ?? '']))
       expect(log).toEqual(['typing stop', 'tool select'])
     })
 
     it('goes in the middle of the frame in view with no point', () => {
       const { place, selection, wide } = harness()
       place.placeSvg(SVG, 'Logo')
-      expect(selection.current()?.frameId).toBe(wide.id)
+      expect(firstFrameOf(selection.current())).toBe(wide.id)
     })
 
     it('says so and places nothing when the file can’t be read', () => {
@@ -410,14 +410,14 @@ describe('editorPlace', () => {
         fills: [{ type: 'image', assetId: 'photo', fit: 'fill' }],
       })
       expect(boxOf(id ?? '')).toEqual({ x: 300, y: 400, width: 400, height: 200 })
-      expect(selection.current()).toEqual({ ids: [id], frameId: square.id })
+      expect(selection.current()).toEqual(pairsIn(square.id, [id ?? '']))
     })
 
     it('places nothing off every frame, and in the middle of the frame in view with no point', () => {
       const { place, selection, wide } = harness()
       expect(place.placeImage(PHOTO, { x: -500, y: -500 })).toBeNull()
       const id = place.placeImage(PHOTO)
-      expect(selection.current()).toEqual({ ids: [id], frameId: wide.id })
+      expect(selection.current()).toEqual(pairsIn(wide.id, [id ?? '']))
     })
   })
 
@@ -429,7 +429,7 @@ describe('editorPlace', () => {
       const image = { type: 'image', assetId: 'photo', fit: 'fill', opacity: 1 }
       expect(fillsOf('wide-a')).toEqual([BLUE, image])
       expect(fillsOf('a')).toEqual([RED])
-      expect(selection.current()).toEqual({ ids: ['wide-a'], frameId: wide.id })
+      expect(selection.current()).toEqual(pairsIn(wide.id, ['wide-a']))
       expect(place.dropTarget()).toBeNull()
       session.undo()
       expect(fillsOf('wide-a')).toEqual([BLUE])
@@ -444,7 +444,7 @@ describe('editorPlace', () => {
     it('selects the layer in its own frame when it was dropped nowhere', () => {
       const { place, selection, square } = harness()
       place.fillWithImage('inside', PHOTO)
-      expect(selection.current()).toEqual({ ids: ['inside'], frameId: square.id })
+      expect(selection.current()).toEqual(pairsIn(square.id, ['inside']))
     })
   })
 })

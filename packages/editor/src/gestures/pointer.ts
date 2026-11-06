@@ -11,7 +11,7 @@ import { type Frame, labelTextAt } from '../canvas/frames.ts'
 import type { EditorView } from '../canvas/view.ts'
 import type { EditorBoxes } from '../layers/boxes.ts'
 import { type Box, localTo } from '../layers/transform.ts'
-import { type EditorSelection, isPath } from '../selection.ts'
+import { type EditorSelection, idsOf, isPath, samePick } from '../selection.ts'
 import { inField } from '../shortcuts.ts'
 import { paragraphAt, wordAt } from '../text/text-edit.ts'
 import type { EditorTyping } from '../text/typing.ts'
@@ -274,9 +274,9 @@ export function editorPointer({
     const deepest = deepestAt(at)
     if (!deepest) return []
     const id = target(deepest.id, frame.id)
-    const current = selection.current()
-    if (!(current?.frameId === frame.id && current.ids.includes(id))) selection.select([id], frame.id)
-    return [...(selection.current()?.ids ?? [])]
+    if (!selection.current()?.some((layer) => samePick(layer, { id, frameId: frame.id })))
+      selection.select([id], frame.id)
+    return idsOf(selection.current())
   }
 
   function keyDown(e: KeyboardEvent) {
@@ -533,7 +533,7 @@ export function editorPointer({
       }
       if (hit.type !== 'text' || view.design().nodes[hit.id]?.lock?.content) return
       typing.stop()
-      selection.selectKeepingModes({ ids: [hit.id], frameId: at.frame.id })
+      selection.selectKeepingModes([{ id: hit.id, frameId: at.frame.id }])
       typing.start(hit.id, at.frame.id, 0)
       typing.caretTo(typing.caretFromPoint(at.p))
       drawOverlay()

@@ -6,7 +6,7 @@ import { type BindingTarget, canBind, fontFamilies, type VariableRef, type Varia
 import type { EditorView } from './canvas/view.ts'
 import { type EditorResources, SHIPPED_FAMILIES } from './resources.ts'
 import { runQuietly } from './run-quietly.ts'
-import type { EditorSelection } from './selection.ts'
+import { type EditorSelection, idsOf } from './selection.ts'
 import type { EditorTyping } from './text/typing.ts'
 
 export interface BrandKitDeps {
@@ -46,7 +46,7 @@ export function editorBrandKit({ session, resources, view, selection, typing, si
     const current = session.design()
     const value = ref ? resources.bytes().variables?.[ref] : undefined
     if (ref && value === undefined) return 0
-    const targets = (selection.current()?.ids ?? []).flatMap((id) => {
+    const targets = idsOf(selection.current()).flatMap((id) => {
       const type = current.nodes[id]?.type ?? ''
       const target: BindingTarget = kind === 'font' ? 'fontFamily' : type === 'text' ? 'textColor' : 'fill'
       return canBind(type, target) ? [{ id, target }] : []
