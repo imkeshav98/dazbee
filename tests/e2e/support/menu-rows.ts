@@ -102,6 +102,8 @@ export const TILE_MENU: readonly (Row & { design?: true })[] = [
   { id: 'delete', name: 'Delete', reads: 'Delete' },
 ]
 
+/** The words of the row with this id in one of the lists above. */
+export const nameOf = (rows: readonly Row[], id: string) => rows.find((row) => row.id === id)?.name ?? id
 /** The words of a row of any of the lists above, by its id. */
 export function rowName(id: string) {
   const rows = [...FULL_MENU, RELEASE_MASK, ...Object.values(FULL_MENU_BESIDE).flat()]

@@ -8,28 +8,27 @@
 // card, Show hidden layers on empty canvas) undo and redo in one step, and a page card's greyed rows
 // say why.
 import { photo, upload } from '../../support/assets.ts'
-import { setCookies } from '../../support/editor.ts'
 import { clickLabel, FRAME_MENU, openSized } from '../../support/frames-on-canvas.ts'
-import { open, redo, undo } from '../../support/linked-menu.ts'
+import { focusedRow, open, openAt, PHONE, redo, undo } from '../../support/linked-menu.ts'
 import { linkedMenuDesign } from '../../support/linked-menu-design.ts'
 import {
   CANVAS_MENU,
   fullMenuRows,
+  nameOf,
   PAGE_MENU,
   PAGE_MENU_WHY,
+  rowName,
   SHAPE_MENU,
   SHARE_MENU,
   TILE_MENU,
   ZOOM_MENU,
 } from '../../support/menu-rows.ts'
 import { DEV_BRAND } from '../../support/seed.ts'
-import { fitSettled, selectLayers } from '../../support/stage.ts'
+import { selectLayers } from '../../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
 import { entered, pagesPanel } from '../../support/top-bar.ts'
 
 test.describe.configure({ mode: 'parallel', timeout: 150_000 })
-
-const PHONE = { width: 390, height: 844 }
 
 /** A menu of the editor: how to bring up its button, its button, its rows' words with keys, a letter and the row it jumps to. */
 interface EditorMenu {
@@ -48,7 +47,7 @@ const MENUS: EditorMenu[] = [
     ready: (page) => selectLayers(page, ['headline']),
     button: (page) => page.getByTestId('bar-more'),
     rows: () => fullMenuRows(),
-    jump: ['h', 'Hide in all frames'],
+    jump: ['h', rowName('hideLinked')],
   },
   {
     name: "a picked frame's ⋯",
@@ -58,29 +57,29 @@ const MENUS: EditorMenu[] = [
     },
     button: (page) => page.getByTestId('bar-frame-more'),
     rows: () => FRAME_MENU.map((row) => row.name),
-    jump: ['r', 'Rename'],
+    jump: ['r', FRAME_MENU[2].name],
   },
   {
     name: 'Share',
     ready: async () => {},
     button: (page) => page.getByTestId('share-open'),
     rows: () => SHARE_MENU.map((row) => row.name),
-    jump: ['s', 'Save as template'],
+    jump: ['s', nameOf(SHARE_MENU, 'template-open')],
   },
   {
     name: 'the shape menu',
     ready: async () => {},
     button: (page) => page.getByTestId('shape-menu'),
     rows: () => SHAPE_MENU.map((row) => row.name),
-    jump: ['s', 'Star'],
-    first: 'Rectangle',
+    jump: ['s', nameOf(SHAPE_MENU, 'star')],
+    first: nameOf(SHAPE_MENU, 'rect'),
   },
   {
     name: 'the zoom menu',
     ready: async () => {},
     button: (page) => page.getByTestId('zoom'),
     rows: () => ZOOM_MENU.map((row) => row.name),
-    jump: ['r', 'Rulers'],
+    jump: ['r', nameOf(ZOOM_MENU, 'rulers')],
   },
   {
     name: "a page card's ⋯",
@@ -90,7 +89,7 @@ const MENUS: EditorMenu[] = [
     // Named "More for" its page in the page's language: the button that opens a menu.
     button: (page) => page.getByTestId('pages').locator('[data-page]').first().locator('button[aria-haspopup="menu"]'),
     rows: () => PAGE_MENU.map((row) => row.name),
-    jump: ['r', 'Rename'],
+    jump: ['r', nameOf(PAGE_MENU, 'rename')],
   },
 ]
 
@@ -103,25 +102,6 @@ const words = (menu: Locator) =>
     .evaluateAll((rows) =>
       rows.map((row) => [...row.childNodes].find((n) => n.textContent?.trim())?.textContent?.trim() ?? ''),
     )
-/** The words of the row that has the focus, without its key. */
-const focusedRow = (page: Page) =>
-  page.evaluate(() => {
-    const row = document.activeElement
-    return row ? ([...row.childNodes].find((n) => n.textContent?.trim())?.textContent?.trim() ?? '') : ''
-  })
-
-/** Opens the linked menu design, in Arabic when asked, at a size, its page fitted. */
-async function openAt(browser: Parameters<typeof open>[0], size = { width: 1280, height: 760 }, arabic = false) {
-  const opened = await open(browser)
-  if (arabic) {
-    await setCookies(opened.page, { locale: 'ar' })
-    await opened.page.reload()
-    await expect(opened.page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
-  }
-  await opened.page.setViewportSize(size)
-  await fitSettled(opened.page)
-  return opened
-}
 
 /** Opens a menu from its button by the keyboard and gives it once its focus is on a row. */
 async function openByKeys(page: Page, menu: EditorMenu) {
@@ -204,6 +184,22 @@ for (const menu of MENUS)
     expect(errors).toEqual([])
   })
 
+for (const menu of MENUS)
+  test(`at 820×1180 ${menu.name} opens by a click wholly inside the screen, its rows in order`, async ({ browser }) => {
+    const { page, errors } = await openAt(browser, { width: 820, height: 1180 })
+    await menu.ready(page)
+    await menu.button(page).click()
+    const opened = openMenu(page)
+    await expect(opened).toBeVisible()
+    await entered(opened)
+    expect(await words(opened)).toEqual(menu.rows())
+    const box = await opened.boundingBox()
+    expect(box && box.x >= 0 && box.y >= 0 && box.x + box.width <= 820 && box.y + box.height <= 1180).toBe(true)
+    await page.keyboard.press('Escape')
+    await expect(opened).toBeHidden()
+    expect(errors).toEqual([])
+  })
+
 test.describe('the actions a menu runs undo and redo in one step', () => {
   /** How many layers, frames and pages the tab's design holds, and the pages' order and hidden layers. */
   const counts = (page: Page) =>
@@ -237,14 +233,14 @@ test.describe('the actions a menu runs undo and redo in one step', () => {
       await selectLayers(page, ['badge'])
       await page.getByTestId('bar-more').click()
       await openMenu(page)
-        .getByRole('menuitem', { name: /^Duplicate/ })
+        .getByRole('menuitem', { name: new RegExp(`^${rowName('duplicate')}`) })
         .click()
     })
     await undoesAndRedoes(page, async () => {
       await clickLabel(page, 'fresh')
       await page.getByTestId('bar-frame-more').click()
       await openMenu(page)
-        .getByRole('menuitem', { name: /^Duplicate/ })
+        .getByRole('menuitem', { name: new RegExp(`^${rowName('duplicate')}`) })
         .click()
     })
     await selectLayers(page, [])
@@ -255,7 +251,9 @@ test.describe('the actions a menu runs undo and redo in one step', () => {
         .first()
         .getByRole('button', { name: /^More for / })
         .click()
-      await openMenu(page).getByRole('menuitem', { name: 'Move down' }).click()
+      await openMenu(page)
+        .getByRole('menuitem', { name: nameOf(PAGE_MENU, 'moveDown') })
+        .click()
     })
     await page.keyboard.press('Escape')
     await selectLayers(page, ['logo'])
@@ -283,12 +281,12 @@ test('a page card’s ⋯ greys the moves it has nothing to do for and says why 
   await page.keyboard.press('Enter')
   const menu = openMenu(page)
   await expect(menu).toBeVisible()
-  await expect.poll(() => focusedRow(page)).toBe('Rename')
-  for (const row of ['Duplicate page', 'Move up']) {
+  await expect.poll(() => focusedRow(page)).toBe(nameOf(PAGE_MENU, 'rename'))
+  for (const row of [nameOf(PAGE_MENU, 'duplicate'), nameOf(PAGE_MENU, 'moveUp')]) {
     await page.keyboard.press('ArrowDown')
     await expect.poll(() => focusedRow(page)).toBe(row)
   }
-  const up = menu.getByRole('menuitem', { name: 'Move up' })
+  const up = menu.getByRole('menuitem', { name: nameOf(PAGE_MENU, 'moveUp') })
   await expect(up).toHaveAttribute('aria-disabled', 'true')
   await expect(page.getByRole('tooltip').filter({ hasText: PAGE_MENU_WHY.moveUp })).toBeVisible()
   const order = await page.evaluate(() => JSON.stringify(window.dazbee?.design().pages))
@@ -309,9 +307,9 @@ test('a library tile’s ⋯ lists its rows, moves by the keyboard and closes on
   const menu = openMenu(page)
   await expect(menu).toBeVisible()
   expect(await words(menu)).toEqual(TILE_MENU.map((row) => row.name))
-  await expect.poll(() => focusedRow(page)).toBe('Rename')
+  await expect.poll(() => focusedRow(page)).toBe(nameOf(TILE_MENU, 'rename'))
   await page.keyboard.press('End')
-  await expect.poll(() => focusedRow(page)).toBe('Delete')
+  await expect.poll(() => focusedRow(page)).toBe(nameOf(TILE_MENU, 'delete'))
   await page.keyboard.press('Escape')
   await expect(menu).toBeHidden()
   await expect(button).toBeFocused()

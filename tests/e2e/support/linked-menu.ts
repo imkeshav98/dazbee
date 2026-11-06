@@ -1,6 +1,7 @@
 // Readers and actions the small menu, full menu and linked menu specs share: the design they
 // open, its layers as a tab holds them, and the full menu's rows, greyed rows and closing.
 import { photo, upload } from './assets.ts'
+import { setCookies } from './editor.ts'
 import { linkedMenuDesign } from './linked-menu-design.ts'
 import { namedRow } from './menu-rows.ts'
 import { fitSettled, openStage, perform } from './stage.ts'
@@ -13,6 +14,33 @@ export async function open(browser: Parameters<typeof openStage>[0]) {
   await fitSettled(opened.page)
   return opened
 }
+
+/** A phone's screen, as the menu specs open one. */
+export const PHONE = { width: 390, height: 844 }
+
+/** Opens the design in one tab at a size, 1280 × 760 unless given, in Arabic when asked, its page fitted. */
+export async function openAt(
+  browser: Parameters<typeof openStage>[0],
+  size = { width: 1280, height: 760 },
+  arabic = false,
+) {
+  const opened = await open(browser)
+  if (arabic) {
+    await setCookies(opened.page, { locale: 'ar' })
+    await opened.page.reload()
+    await expect(opened.page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
+  }
+  await opened.page.setViewportSize(size)
+  await fitSettled(opened.page)
+  return opened
+}
+
+/** The words of the row that has the focus, without its key: its first piece of text. */
+export const focusedRow = (page: Page) =>
+  page.evaluate(() => {
+    const row = document.activeElement
+    return row ? ([...row.childNodes].find((n) => n.textContent?.trim())?.textContent?.trim() ?? '') : ''
+  })
 
 /** A layer as the tab's design holds it now. */
 export const node = (page: Page, id: string) =>

@@ -185,7 +185,7 @@ test('glass buttons and rows take the hover tint and, while pressed, the pressed
       .last()
       .getByRole('button', { name: /^More for / })
       .click()
-    await page.getByRole('button', { name: 'Delete page' }).click()
+    await page.getByRole('menuitem', { name: 'Delete page' }).click()
     const undo = page.getByTestId('removed-toast').getByRole('button', { name: 'Undo' })
     await hovered(undo, { fill: glass.hover, colour: glass.text })
     await pressed(page, undo, { fill: glass.pressed, colour: glass.text })

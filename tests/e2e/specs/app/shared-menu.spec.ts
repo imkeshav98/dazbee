@@ -5,36 +5,18 @@
 // row, and runs nothing; a menu beside its row on tablet and desktop, and on a phone in the menu's
 // place under a back row; and all of it mirrored in Arabic.
 import { photo, upload } from '../../support/assets.ts'
-import { setCookies } from '../../support/editor.ts'
 import { boxOf } from '../../support/layout.ts'
-import { open } from '../../support/linked-menu.ts'
+import { focusedRow, openAt, PHONE } from '../../support/linked-menu.ts'
 import { besideRows, fullMenuRows, rowName, rowsUnderTooltip } from '../../support/menu-rows.ts'
-import { fitSettled, openStage, selectLayers } from '../../support/stage.ts'
+import { openStage, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { entered } from '../../support/top-bar.ts'
 import { topBarDesign } from '../../support/top-bar-design.ts'
 
 test.describe.configure({ mode: 'parallel', timeout: 120_000 })
 
-const PHONE = { width: 390, height: 844 }
-
-/** The words of the row that has the focus, without its key. */
-const focusedRow = (page: Page) => page.evaluate(() => document.activeElement?.firstChild?.textContent?.trim() ?? '')
 /** The test id of the element that has the focus. */
 const focused = (page: Page) => page.evaluate(() => document.activeElement?.getAttribute('data-testid') ?? '')
-
-/** Opens the linked menu design, in Arabic when asked, at a size, its page fitted. */
-async function openAt(browser: Parameters<typeof open>[0], size = { width: 1280, height: 760 }, arabic = false) {
-  const opened = await open(browser)
-  if (arabic) {
-    await setCookies(opened.page, { locale: 'ar' })
-    await opened.page.reload()
-    await expect(opened.page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
-  }
-  await opened.page.setViewportSize(size)
-  await fitSettled(opened.page)
-  return opened
-}
 
 /** Opens the full menu from ⋯ by the keyboard, for the layer given, and gives it. */
 async function fullMenuByKeys(page: Page, id: string) {
@@ -63,9 +45,9 @@ test('is a menu of menu items: the arrows go round from the ends, Home and End j
     ['End', rows.at(-1)],
     ['Home', rows[0]],
     // Typing jumps to the next row whose words start with what was typed, a second apart.
-    ['h', 'Hide in all frames'],
-    ['p', 'Paste'],
-    ['p', 'Put in a box'],
+    ['h', rowName('hideLinked')],
+    ['p', rowName('more-paste')],
+    ['p', rowName('boxSelection')],
   ] as const) {
     if (key.length === 1) await page.waitForTimeout(1100)
     await page.keyboard.press(key)
@@ -81,7 +63,7 @@ test('a greyed row stays in the arrow order, says why beside itself over no othe
   // A frame linked to no other: Copy to other frames has nothing to do.
   const menu = await fullMenuByKeys(page, 'fresh-title')
   // Down past Paste and Duplicate onto it, a key at a time as Radix moves the focus after each.
-  for (const row of ['Paste', 'Duplicate', 'Copy to other frames']) {
+  for (const row of ['more-paste', 'duplicate', 'more-copy-to-frames'].map(rowName)) {
     await page.keyboard.press('ArrowDown')
     await expect.poll(() => focusedRow(page)).toBe(row)
   }
