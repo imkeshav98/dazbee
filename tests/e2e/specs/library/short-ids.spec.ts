@@ -9,6 +9,7 @@ import { parseDesign } from '@dazbee/schema'
 import { designOf, editorPath, openTabs, reloads, settle, writeOutput } from '../../support/editor.ts'
 import { expectNode, openExport, runExport } from '../../support/export.ts'
 import { storeDesign } from '../../support/local-servers.ts'
+import { nameOf, TILE_MENU } from '../../support/menu-rows.ts'
 import { DEV_BRAND, liveDesign } from '../../support/seed.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 
@@ -83,7 +84,8 @@ test('a design made in a new brand opens at a link of two short ids, its edits r
     .first()
     .getByRole('button', { name: `More for ${name}` })
     .click()
-  await tile.first().getByRole('menuitem', { name: 'Duplicate' }).click()
+  // The tile's menu opens over the page, outside the tile.
+  await page.getByRole('menuitem', { name: nameOf(TILE_MENU, 'duplicate') }).click()
   const copy = page.getByTestId('design-tile').filter({ hasText: `${name} copy` })
   await expect(copy).toHaveAttribute('data-design', new RegExp(`^${SHORT}$`))
   const copyId = (await copy.getAttribute('data-design')) ?? ''
