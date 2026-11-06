@@ -49,14 +49,18 @@ export const FACE_SIZE = 'shrink-0 max-sm:size-[32px] [@media(hover:none)]:size-
 export const SWATCH_FACE = `${FACE_SIZE} rounded-full`
 /** A round colour swatch, drawn in a SWATCH_TARGET; its size off a phone is the caller's. */
 export const SWATCH = `${SWATCH_FACE} border border-swatch-ring transition-transform duration-[var(--chrome-fast)] group-hover/swatch:scale-110`
-/** A row of swatch targets, wrapping onto more lines; on a phone TOUCH_GAP apart. */
-export const SWATCH_ROW = `flex flex-wrap items-center ${TOUCH_GAP}`
+/**
+ * A row of swatch targets, wrapping onto more lines; on a phone or a touch screen TOUCH_GAP apart at
+ * the least, spread across the row in columns of 44 px targets, each line lined up with the one above.
+ */
+export const SWATCH_ROW = `flex flex-wrap items-center ${TOUCH_GAP} max-sm:grid max-sm:grid-cols-[repeat(auto-fill,44px)] max-sm:justify-between [@media(hover:none)]:grid [@media(hover:none)]:grid-cols-[repeat(auto-fill,44px)] [@media(hover:none)]:justify-between`
 /**
  * A touch area for a control drawn smaller than a finger, such as a gradient's stop: an empty element
  * inside the control, shown only on a phone or a touch screen, 44 px across and centred on it, so a press anywhere in
  * it lands on the control.
  */
-export const TOUCH_AREA = 'absolute top-1/2 left-1/2 hidden size-[44px] -translate-1/2 max-sm:block [@media(hover:none)]:block'
+export const TOUCH_AREA =
+  'absolute top-1/2 left-1/2 hidden size-[44px] -translate-1/2 max-sm:block [@media(hover:none)]:block'
 
 /** Colours a click away when the brand's kit has none; the hex fields take any colour. */
 export const SWATCHES = [
