@@ -73,8 +73,7 @@ export interface ActionsDeps {
   autoLayoutDrag: Pick<EditorAutoLayoutDrag, 'nudge'>
   frameActions: Pick<EditorFrameActions, 'frameAction'>
   /**
-   * Tells the app that auto layout places some of the layers an align or distribute would move, or
-   * some of the selected layers an ungroup leaves whole while it takes the others apart.
+   * Tells the app that auto layout places some of the layers an align or distribute would move.
    */
   notify: (notice: 'placedByLayout') => void
   /** Draws the overlay. */
@@ -498,11 +497,11 @@ export function editorActions({
         // and a boolean's shapes show their own paints again. In an auto layout box, a layer comes
         // apart only when what it held takes its place in the flow with nothing moving, and one
         // locked against deleting stays whole; while none can, the menus grey Ungroup with the
-        // reason and its key does nothing.
-        const { parts, selected: containers, placedByLayout } = ungroupable()
+        // reason and its key does nothing. In a mixed selection what can come apart does, and the
+        // rest stays as it is, with no notice.
+        const { parts, selected: containers } = ungroupable()
         if (containers === 0) return false
         if (parts.every((part) => part.groups.length === 0)) return true
-        if (placedByLayout > 0) notify('placedByLayout')
         const freeing = new Map(parts.map((part) => [part.frame.id, part.groups]))
         eachFrame((f, ids) => {
           const groups = freeing.get(f.id) ?? []

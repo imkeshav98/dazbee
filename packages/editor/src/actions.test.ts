@@ -98,6 +98,17 @@ describe('editorActions', () => {
       expect(log).not.toContain('placedByLayout')
     })
 
+    it('ungroups what can come apart in a mixed selection and leaves the rest, with no notice', () => {
+      const { actions, session, selection, frame, log } = harness(false, FLOW)
+      // A box in the flow that comes apart, one whose auto layout would move what it holds, and a plain layer.
+      selection.select(['row', 'hugging', 'fixed'], frame.id)
+      expect(actions.perform('ungroup')).toBe(true)
+      expect(session.design().nodes.row).toBeUndefined()
+      expect(session.design().nodes.hugging?.type).toBe('box')
+      expect(idsOf(selection.current())).toEqual(expect.arrayContaining(['hugging', 'fixed']))
+      expect(log).not.toContain('placedByLayout')
+    })
+
     it('aligns the selected layers to the left one, as one undo step', () => {
       const { actions, session, selection, frame, at } = harness()
       selection.select(['a', 'b'], frame.id)
