@@ -1,5 +1,6 @@
 // The layer a click or a hover picks: the topmost one that shows under the point. A shape counts
-// inside its outline, as the renderer draws it, and on its strokes; a text on its laid-out lines.
+// inside its outline, as the renderer draws it, and on its strokes; a text on its laid-out lines, or
+// anywhere in its box while it frosts what lies behind.
 // Where a layer is drawn under 10% opaque, its own opacity, its groups', its mask's and its paint's
 // there multiplied, it shows nothing, and the click passes to the layer beneath.
 import type { CanvasKit, Path } from '@dazbee/canvaskit'
@@ -166,6 +167,8 @@ function layerAt(layer: SceneLayer, p: Point, looks: Looks, options: HitOptions,
       if (!shows(looks, layer, q, fade)) return null
       return shapeUnder(looks, layer.children, q, options.pickable ?? everything) ?? layer
     case 'text':
+      // Frosted text frosts its whole box, so it is picked anywhere there; else only on its lines.
+      if (frosted(layer) && fade >= SEE_THROUGH && inBox(q, layer.props)) return layer
       return shown * textShade(layer.props, false) >= SEE_THROUGH && onLines(looks, layer, q) ? layer : null
     case 'graphic':
       return shows(looks, layer, q, fade) ? layer : null

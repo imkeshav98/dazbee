@@ -522,6 +522,16 @@ describe('hitTest', () => {
     expect(idAt(over(layer('group', 'group', { ...SQUARE, opacity: 0 }, [faded('pane', glass)])), 50, 50)).toBe('under')
   })
 
+  it('picks frosted text anywhere in its box, which it frosts whole, not only on its lines', () => {
+    const glass = { effects: [{ type: 'backgroundBlur', radius: 20 }] }
+    const words = text('words', 'Hi', { x: 0, y: 0, width: 600, height: 300 }, glass)
+    const layers = [rect('under', 0, 0, 800, 400), words]
+    expect(idAt(layers, 15, 25)).toBe('words')
+    expect(idAt(layers, 300, 25)).toBe('words')
+    expect(idAt(layers, 15, 250)).toBe('words')
+    expect(idAt(layers, 700, 350)).toBe('under')
+  })
+
   it('picks a selected layer that shows nothing anywhere in its box, and a visible one only where it shows', () => {
     const pick = (layers: SceneLayer[], x: number, y: number, selected: string[]) =>
       hitTest(layers, { x, y }, looks, { selected })?.id
