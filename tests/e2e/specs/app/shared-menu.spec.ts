@@ -5,10 +5,12 @@
 // row, and runs nothing; a menu beside its row on tablet and desktop, and on a phone in the menu's
 // place under a back row; and all of it mirrored in Arabic.
 import { photo, upload } from '../../support/assets.ts'
+import { openSized } from '../../support/frames-on-canvas.ts'
 import { boxOf } from '../../support/layout.ts'
 import { focusedRow, openAt, PHONE } from '../../support/linked-menu.ts'
+import { linkedMenuDesign } from '../../support/linked-menu-design.ts'
 import { besideRows, fullMenuRows, rowName, rowsUnderTooltip } from '../../support/menu-rows.ts'
-import { openStage, selectLayers } from '../../support/stage.ts'
+import { nextFrame, openStage, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { entered } from '../../support/top-bar.ts'
 import { topBarDesign } from '../../support/top-bar-design.ts'
@@ -274,5 +276,75 @@ for (const how of ['full menu', 'right-click menu'])
     // Onto another row of the menu: this one closes.
     await menu.locator('[data-action="duplicate"]').hover()
     await expect(sub).toBeHidden()
+    expect(errors).toEqual([])
+  })
+
+test('on a touch phone a tap on ⋯ opens the sheet wherever ⋯ sits, and runs no row the sheet brings under the finger', async ({
+  browser,
+}) => {
+  const asset = await upload(photo)
+  const { page, errors } = await openSized(browser, PHONE, {
+    input: linkedMenuDesign(asset.id),
+    touch: true,
+    mobile: true,
+  })
+  const layers = () => page.evaluate(() => Object.keys(window.dazbee?.design().nodes ?? {}).length)
+  await selectLayers(page, ['fresh-title'])
+  const count = await layers()
+  for (const lift of [0, 60, 120, 180, 240]) {
+    // ⋯ lower on the screen each time, where the sheet's rows will come up under the finger.
+    await page.evaluate(
+      (dy) => {
+        const camera = window.dazbee?.camera()
+        if (camera) window.dazbee?.setCamera({ ...camera, y: camera.y + dy })
+      },
+      lift === 0 ? 0 : 60,
+    )
+    await nextFrame(page)
+    const more = page.getByTestId('bar-more')
+    if (!(await more.isVisible())) continue
+    await more.tap()
+    const menu = page.getByTestId('bar-more-menu')
+    await expect(menu, `${lift}`).toBeVisible()
+    await entered(menu)
+    await expect(menu.locator('[data-menu-in-place]'), `${lift}`).toHaveCount(0)
+    expect(await layers(), `${lift}`).toBe(count)
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+  }
+  expect(errors).toEqual([])
+})
+
+for (const [row, steps] of [
+  ['copy', 1],
+  ['copyStyle', 1],
+  ['copyStyle', 2],
+] as const)
+  test(`in Arabic a menu beside a row opened by a click takes a pointer moved onto its ${row} row in ${steps} step(s), and the row runs`, async ({
+    browser,
+  }) => {
+    const { page, errors } = await openAt(browser, undefined, true)
+    await selectLayers(page, ['headline'])
+    const count = () => page.evaluate(() => Object.keys(window.dazbee?.design().nodes ?? {}).length)
+    const before = await count()
+    await page.getByTestId('bar-more').click()
+    const menu = page.getByTestId('bar-more-menu')
+    await expect(menu).toBeVisible()
+    await entered(menu)
+    await menu.getByTestId('more-copy').click()
+    const sub = page.getByTestId('more-copy-menu')
+    await expect(sub).toBeVisible()
+    await entered(sub)
+    const target = await sub.locator(`[data-action="${row}"]`).boundingBox()
+    if (!target) throw new Error(`no ${row} row`)
+    await page.evaluate(() => localStorage.removeItem('dazbee.copiedLayers'))
+    await page.mouse.move(target.x + target.width / 2, target.y + target.height / 2, { steps })
+    await page.waitForTimeout(300)
+    await expect(sub).toBeVisible()
+    await page.mouse.down()
+    await page.mouse.up()
+    await expect(menu).toBeHidden()
+    expect(await count()).toBe(before)
+    expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['headline'])
     expect(errors).toEqual([])
   })
