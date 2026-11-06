@@ -318,8 +318,9 @@ export function OpacityField({
   onSet: (value: number) => void
   onShift: (by: number) => void
 }) {
+  // On a touch screen a little narrower, so a row's 44 px swatch target leaves its hex whole.
   return (
-    <div className="w-[4.5rem] shrink-0">
+    <div className="w-[4.5rem] shrink-0 [@media(hover:none)]:w-[4rem]">
       <NumberField
         label=""
         name={name}
