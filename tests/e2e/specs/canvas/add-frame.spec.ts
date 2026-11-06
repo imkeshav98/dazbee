@@ -335,7 +335,7 @@ test("Add size in a picked frame's ⋯ opens “Add a size to Square”: a tile 
   expect(errors).toEqual([])
 })
 
-test('Add size by the keyboard: Tab to the bar, ⋯, Add size; Esc gives the focus back to ⋯, and a size of your own adds with Enter', async ({
+test('Add size by the keyboard: Tab to the bar, ⋯, the down arrow to Add size; Esc gives the focus back to ⋯, and a size of your own adds with Enter', async ({
   browser,
 }) => {
   const { a, errors } = await openFrames(browser)
@@ -354,7 +354,7 @@ test('Add size by the keyboard: Tab to the bar, ⋯, Add size; Esc gives the foc
   expect(await picked(a)).toBe('sq')
 
   await a.keyboard.press('Enter')
-  await a.keyboard.press('Tab')
+  await frameMenuItems(a, 'Add size')
   await a.keyboard.press('Enter')
   await expect(card(a)).toHaveAttribute('data-panel', 'addSize')
   const width = a.getByTestId('own-width')

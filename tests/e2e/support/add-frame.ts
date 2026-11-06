@@ -16,7 +16,7 @@ export async function frameButton(page: Page) {
 /** Opens the picked frame's ⋯ and its Add size, and waits for the card. */
 export async function addSize(page: Page) {
   const menu = await barMenu(page, 'frame-more')
-  await menu.getByRole('button', { name: 'Add size' }).click()
+  await menu.getByRole('menuitem', { name: 'Add size' }).click()
   await expect(card(page)).toHaveAttribute('data-panel', 'addSize')
 }
 /** Types a size of your own into the card's fields. */

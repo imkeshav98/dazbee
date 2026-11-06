@@ -40,8 +40,8 @@ test.describe('the full menu', () => {
     await page.keyboard.press('ArrowRight')
     const copy = page.getByTestId('more-copy-menu')
     await expect(copy).toBeVisible()
-    await expect(copy.getByRole('button').first()).toBeFocused()
-    await expect(copy.getByRole('button')).toHaveText(FULL_MENU_BESIDE.copy.map((row) => row.reads))
+    await expect(copy.getByRole('menuitem').first()).toBeFocused()
+    await expect(copy.getByRole('menuitem')).toHaveText(FULL_MENU_BESIDE.copy.map((row) => row.reads))
     await page.keyboard.press('ArrowLeft')
     await expect(copy).toBeHidden()
     await expect(menu.getByTestId('more-copy')).toBeFocused()
@@ -86,7 +86,7 @@ test.describe('the full menu', () => {
     // Beside a row: the arrow towards it opens the menu, the arrows move through it, the arrow back closes it.
     await page.keyboard.press('ArrowRight')
     const copy = page.getByTestId('more-copy-menu')
-    await expect(copy.getByRole('button').first()).toBeFocused()
+    await expect(copy.getByRole('menuitem').first()).toBeFocused()
     const [copyRow, styleRow] = besideRows('copy')
     for (const [key, row] of [
       ['ArrowDown', styleRow],
@@ -116,6 +116,7 @@ test.describe('the full menu', () => {
     await page.keyboard.press('ArrowDown')
     await expect.poll(() => focusedRow(page)).toBe(second)
     await page.keyboard.press('ArrowUp')
+    await expect.poll(() => focusedRow(page)).toBe(rows[0])
     await page.keyboard.press('ArrowUp')
     await expect.poll(() => focusedRow(page)).toBe(last)
     expect(errors).toEqual([])
@@ -211,7 +212,7 @@ test.describe('the full menu', () => {
     ] as const) {
       await selectLayers(page, [...ids])
       const sub = await moreSubmenu(page, 'copy-to-frames')
-      await expect(sub.getByRole('button')).toHaveText(
+      await expect(sub.getByRole('menuitem')).toHaveText(
         besideRows('copy-to-frames', { text }).map((name) => new RegExp(`^${name}`)),
       )
       await expect(sub.getByText('To the 2 linked frames')).toBeVisible()
@@ -432,7 +433,7 @@ test.describe('at each screen size', () => {
     await expect.poll(() => layoutProblems(page, { pieces: PIECES, uncut: UNCUT })).toEqual([])
     // Wholly on the screen and on top, each row a finger's height, once it has popped in.
     await entered(sub)
-    const rows = await sub.getByRole('button').evaluateAll((buttons) =>
+    const rows = await sub.getByRole('menuitem').evaluateAll((buttons) =>
       buttons.map((button) => {
         const r = button.getBoundingClientRect()
         const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)

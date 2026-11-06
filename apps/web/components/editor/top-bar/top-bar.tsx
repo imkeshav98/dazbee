@@ -26,13 +26,13 @@ import {
   setBar,
   setOpen,
   useEditState,
-  usePhone,
 } from '@/components/editor/edit-store.ts'
 import { usePickedFrame, useSelection } from '@/components/editor/editor-hooks.ts'
 import { BAR_BUTTON, BAR_DIVIDER, BAR_ROW } from '@/components/editor/styles.ts'
 import { useLiveDesign } from '@/components/editor/use-live-design.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
+import { usePhone } from '@/lib/phone.ts'
 
 import { arrowAlong, useRovingTab } from './bar-popover.tsx'
 import { useFrameItems } from './frame-items.tsx'

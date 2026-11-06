@@ -92,16 +92,17 @@ test("at tablet size with a flyout open, the bar's second row and its pop-ups an
   expect(errors).toEqual([])
 })
 
-test('at 1280×760 the right-click menu on a layer already selected shows that it scrolls, with a fade at its cut edge', async ({
+test('in a short window the right-click menu on a layer already selected shows that it scrolls, with a fade at its cut edge', async ({
   browser,
 }) => {
   const asset = await upload(photo)
   const { page, errors } = await openStage(browser, topBarDesign(asset.id))
-  await page.setViewportSize({ width: 1280, height: 760 })
+  // Short enough that the room between the top bar and the bottom controls holds less than its rows:
+  // the menu moves up to fit what room there is, and scrolls past that.
+  await page.setViewportSize({ width: 1280, height: 480 })
   await fitSettled(page)
   await selectLayers(page, ['headline'])
-  // The headline in the middle of the stage, where its menu has room for less than all its rows
-  // either way.
+  // The headline in the middle of the stage.
   await page.evaluate(() => window.dazbee?.fitSelection())
   await drawn(page)
   const at = await screenPoint(page, 200, 85)

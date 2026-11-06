@@ -318,7 +318,7 @@ for (const [width, height] of SCREEN_SIZES) {
         await clickLabel(page, 'sq')
         await barMenu(page, 'frame-more')
         await shot('3-menu')
-        await page.getByTestId('bar-frame-more-menu').getByRole('button', { name: 'Add size' }).click()
+        await page.getByTestId('bar-frame-more-menu').getByRole('menuitem', { name: 'Add size' }).click()
         await expect(card(page)).toHaveAttribute('data-panel', 'addSize')
         await shot('4-add-size')
         await page.keyboard.press('Escape')

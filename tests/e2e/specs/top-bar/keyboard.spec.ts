@@ -100,6 +100,15 @@ test("Esc closes the bar's second row and keeps the selection; the arrows and En
 
   await more.click()
   await expect(page.getByTestId('top-bar-overflow')).toBeVisible()
+  // A menu opened over the row closes first, Share's and the zoom menu's alike, the row staying.
+  for (const button of ['share-open', 'zoom']) {
+    await page.getByTestId(button).click()
+    const menu = page.getByRole('menu')
+    await expect(menu).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
+    await expect(page.getByTestId('top-bar-overflow'), button).toBeVisible()
+  }
   await page.keyboard.press('Escape')
   await expect(page.getByTestId('top-bar-overflow')).toBeHidden()
   expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['headline'])
@@ -290,28 +299,23 @@ test('Esc closes the account menu over the Colour panel first, wherever the focu
   await expect(panel).toBeHidden()
   expect(await selection(page)).toEqual(['box'])
 
-  // Opened from the keyboard over the Share menu, with the focus in it, it closes first, then the Share menu.
+  // The Share menu keeps Tab inside it, as every menu does (its arrows move between its rows), and
+  // Esc closes it onto Share, keeping the selection.
   const share = page.getByTestId('share-open')
   const exportItem = page.getByTestId('export-open')
   await share.click()
+  await expect(exportItem).toBeFocused()
   await page.keyboard.press('End')
   await page.keyboard.press('Tab')
-  await expect(avatar).toBeFocused()
-  await page.keyboard.press('Enter')
-  await expect(account).toBeVisible()
-  await page.keyboard.press('Tab')
-  await expect(account.getByRole('radio', { name: 'English', exact: true })).toBeFocused()
-  await page.keyboard.press('Escape')
-  await expect(account).toBeHidden()
-  await expect(exportItem).toBeVisible()
-  await expect(avatar).toBeFocused()
+  await expect(page.getByTestId('template-open')).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(exportItem).toBeHidden()
+  await expect(share).toBeFocused()
   expect(await selection(page)).toEqual(['box'])
   expect(errors).toEqual([])
 })
 
-test('a zoom or shape pop-up opened from the keyboard over the Share or account menu closes first on Esc, then the menu, then the Colour panel', async ({
+test('a zoom menu opened from the keyboard closes the Share menu, and the shape menu over the account menu closes first on Esc, then the account menu, then the Colour panel', async ({
   browser,
 }) => {
   const asset = await upload(photo)
@@ -323,16 +327,17 @@ test('a zoom or shape pop-up opened from the keyboard over the Share or account 
   const zoom = page.getByTestId('zoom-menu')
   const shapes = page.getByRole('menu', { name: 'Shapes' })
 
+  // One menu shows at a time: the zoom menu opened from the keyboard closes the Share menu. Esc
+  // closes the zoom menu onto its button, leaving the Colour panel open.
   await page.getByTestId('share-open').click()
   await expect(exportItem).toBeFocused()
   await page.getByTestId('zoom').focus()
+  await expect(exportItem).toBeHidden()
   await page.keyboard.press('Enter')
   await expect(zoom).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(zoom).toBeHidden()
-  await expect(exportItem).toBeVisible()
-  await page.keyboard.press('Escape')
-  await expect(exportItem).toBeHidden()
+  await expect(page.getByTestId('zoom')).toBeFocused()
   await expect(panel).toBeVisible()
 
   await page.getByTestId('account-open').click()
@@ -500,7 +505,7 @@ test.describe('the focus as a menu of the bar closes', () => {
     const { page, errors } = await openStage(browser, oneLayer())
     await selectLayers(page, ['a'])
     const copy = await moreSubmenu(page, 'copy')
-    await copy.getByRole('button').first().focus()
+    await copy.getByRole('menuitem').first().focus()
 
     await keyThen(page, { key: 'Escape', closed: 'more-copy-menu', next: 'esc', then: '!bar-more-menu' })
     await timers(page)

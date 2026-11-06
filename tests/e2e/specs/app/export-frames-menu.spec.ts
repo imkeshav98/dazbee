@@ -39,7 +39,7 @@ test('a picked frame’s ⋯ has Export after Rename, before the line and Delete
     .locator('button, [role="separator"]')
     .evaluateAll((all) => all.map((el) => el.getAttribute('data-action') ?? el.getAttribute('role')))
   expect(items.slice(items.indexOf('rename'))).toEqual(['rename', 'export', 'separator', 'delete'])
-  await menu.getByRole('button', { name: 'Export', exact: true }).click()
+  await menu.getByRole('menuitem', { name: 'Export', exact: true }).click()
   await expect(menu).toBeHidden()
   const dialog = page.getByTestId('export')
   await expect(dialog).toBeVisible()
@@ -63,15 +63,15 @@ test('a picked frame’s ⋯ has Export after Rename, before the line and Delete
   await expect(page.getByTestId('bar-frame-more')).toBeFocused()
   expect(await picked(page)).toBe('story')
 
-  // By keyboard, from the banner: Tab to the bar, along to ⋯, Enter, Tab down to Export, Enter.
+  // By keyboard, from the banner: Tab to the bar, along to ⋯, Enter, the down arrow to Export, Enter.
   await clickLabel(page, 'banner')
   expect(await picked(page)).toBe('banner')
   // The bar's one Tab stop is the item last focused in it, ⋯ here.
   expect(await tabToBar(page)).toBe('bar-frame-more')
   await page.keyboard.press('Enter')
-  const exportItem = menu.getByRole('button', { name: 'Export', exact: true })
+  const exportItem = menu.getByRole('menuitem', { name: 'Export', exact: true })
   for (let i = 0; i < 6 && !(await exportItem.evaluate((el) => el === document.activeElement)); i++)
-    await page.keyboard.press('Tab')
+    await page.keyboard.press('ArrowDown')
   await expect(exportItem).toBeFocused()
   await page.keyboard.press('Enter')
   await expect(dialog).toBeVisible()
@@ -107,7 +107,7 @@ test('while Export is open, from Share or a picked frame’s ⋯, Share shows it
 
   await clickLabel(page, 'story')
   const menu = await barMenu(page, 'frame-more')
-  await menu.getByRole('button', { name: 'Export', exact: true }).click()
+  await menu.getByRole('menuitem', { name: 'Export', exact: true }).click()
   await expect(dialog.getByRole('heading', { name: 'Export', exact: true })).toBeVisible()
   await expect
     .poll(async () => {

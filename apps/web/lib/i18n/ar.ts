@@ -243,7 +243,6 @@ export const ar: Messages = {
       show: 'إظهار',
       topBar: 'الطبقات المحددة',
       smallMenu: 'إجراءات الطبقة',
-      backFrom: 'رجوع من {menu}',
       overflow: 'مزيد من الأدوات',
       copy: 'نسخ',
       paste: 'لصق',
@@ -385,6 +384,9 @@ export const ar: Messages = {
       moveUp: 'إلى الأعلى',
       moveDown: 'إلى الأسفل',
       remove: 'حذف الصفحة',
+      firstAlready: 'هذه الصفحة هي الأولى بالفعل',
+      lastAlready: 'هذه الصفحة هي الأخيرة بالفعل',
+      onlyPage: 'يبقى في التصميم صفحة واحدة على الأقل',
       removed: 'حُذفت {name}',
     },
     brandKit: {
@@ -865,6 +867,7 @@ export const ar: Messages = {
     light: 'فاتح',
     dark: 'داكن',
   },
+  menu: { backFrom: 'رجوع من {menu}' },
   language: { label: 'اللغة' },
   account: { open: 'حسابك', settings: 'الإعدادات', workspace: 'مساحة العمل' },
   signIn: {

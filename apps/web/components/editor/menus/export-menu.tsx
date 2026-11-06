@@ -18,11 +18,10 @@ import {
 } from '@dazbee/schema'
 
 import { NumberField } from '@/components/editor/edit-panel/fields.tsx'
-import { usePhone } from '@/components/editor/edit-store.ts'
 import { useShownPage } from '@/components/editor/editor-hooks.ts'
-import { FIELD, FIELD_LABEL, MENU_VALUE } from '@/components/editor/styles.ts'
+import { FIELD, FIELD_LABEL } from '@/components/editor/styles.ts'
 import { Button } from '@/components/ui/button.tsx'
-import { LIT_ROW, SEGMENT, SEGMENTS } from '@/components/ui/looks.ts'
+import { LIT_ROW, MENU_VALUE, SEGMENT, SEGMENTS } from '@/components/ui/looks.ts'
 import { useOverlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { Select } from '@/components/ui/select.tsx'
 import { Tick } from '@/components/ui/tick.tsx'
@@ -30,6 +29,7 @@ import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { counted, format } from '@/lib/i18n/index.ts'
+import { usePhone } from '@/lib/phone.ts'
 
 /** Which of the page's frames are ticked: every one, or these. */
 type Ticked = 'all' | ReadonlySet<string>

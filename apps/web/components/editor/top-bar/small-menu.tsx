@@ -19,41 +19,40 @@ import {
   LockSimpleOpenIcon,
   TrashIcon,
 } from '@phosphor-icons/react'
-import * as Popover from '@radix-ui/react-popover'
 import { useEffect, useLayoutEffect, useState } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 
 import { keyOf } from '@/components/editor/arrange-actions.ts'
 import { useTarget } from '@/components/editor/edit-panel/target.ts'
-import { editState, isPanel, setOpen, useEditState, usePhone } from '@/components/editor/edit-store.ts'
+import { editState, isPanel, setOpen, useEditState } from '@/components/editor/edit-store.ts'
 import { useSelection } from '@/components/editor/editor-hooks.ts'
-import { BAR_BUTTON, BAR_TOGGLE, MENU, MENU_ITEM_GREYED } from '@/components/editor/styles.ts'
+import { BAR_BUTTON, BAR_TOGGLE } from '@/components/editor/styles.ts'
+import { MENU_ITEM_GREYED } from '@/components/ui/looks.ts'
+import { Menu, type MenuPlace, WIDE_MENU } from '@/components/ui/menu.tsx'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { cn } from '@/lib/cn.ts'
 import { type Box, CLEAR, smallMenuPlace } from '@/lib/editor/small-menu-place.ts'
 import { useLocale, useMessages } from '@/lib/i18n/client.tsx'
 import { dirOf, format } from '@/lib/i18n/index.ts'
+import { usePhone } from '@/lib/phone.ts'
 
-import {
-  arrowAlong,
-  arrowThrough,
-  SHEET_LOOK,
-  SHEET_PLACE,
-  SheetAnchor,
-  useEscapeBack,
-  useMenuFocus,
-  useRovingTab,
-  useScrollingMenu,
-} from './bar-popover.tsx'
-import { LayerActions, WIDE_MENU } from './layer-actions.tsx'
+import { arrowAlong, useRovingTab } from './bar-popover.tsx'
+import { LayerActions } from './layer-actions.tsx'
 
 type Place = { left: number; top: number }
 /**
- * Where the full menu opens: beside the small menu on its end or start side, or under it; and how
- * far from the window's start edge it keeps, past the rail and its open flyout.
+ * Where the full menu opens: beside the small menu on its end or start side, or under it; how far
+ * from the window's start edge it keeps, past the rail and its open flyout; and where it lies from ⋯.
  */
-type FullMenuPlace = { side: 'end' | 'start' | 'under'; startInset: number }
+type FullMenuPlace = {
+  side: 'end' | 'start' | 'under'
+  startInset: number
+  /** How far the small menu reaches past ⋯ on the side the menu opens, in pixels. */
+  beside: number
+  /** How far along that side the menu's start lies from ⋯'s, in pixels. */
+  along: number
+}
 
 /** Pixels between the small menu and the full menu. */
 const MENU_GAP = 8
@@ -165,21 +164,30 @@ function usePlace(editor: Editor, menu: HTMLElement | null, rightClick: boolean)
 /**
  * Where the full menu opens on tablet and desktop: beside the small menu on its end side when there
  * is room for it and the widest menu beside its rows, else on its start side, kept off the rail and
- * its open flyout; under it when neither side has room. Under it, the menu keeps off the flyout only
- * when the room past the flyout holds it, and off the rail always. Measured once the full menu shows,
- * and again as the small menu, the flyout or the window changes; a phone shows it as a sheet.
+ * its open flyout; under it, centred, when neither side has room. Under it, the menu keeps off the
+ * flyout only when the room past the flyout holds it, and off the rail always. It hangs from ⋯
+ * (`more`), so each place is measured from ⋯ to the small menu's edges. Measured once the full menu
+ * shows, and again as the small menu, the flyout or the window changes; a phone shows it as a sheet.
  */
 function useFullMenuPlace(
   menu: HTMLElement | null,
-  content: HTMLElement | null,
+  more: HTMLElement | null,
+  shown: boolean,
   place: Place | null,
   phone: boolean,
   rtl: boolean,
-): FullMenuPlace {
-  const [at, setAt] = useState<FullMenuPlace>({ side: 'end', startInset: CLEAR })
-  const { flyoutEnd } = useEditState()
+): MenuPlace {
+  const [at, setAt] = useState<FullMenuPlace>({ side: 'end', startInset: CLEAR, beside: 0, along: 0 })
+  const { flyoutEnd, barBottom } = useEditState()
+  // Bumped while the full menu is shown but not yet in the page: its portal puts it there a render later.
+  const [looked, setLooked] = useState(0)
   useLayoutEffect(() => {
-    if (!menu || !content || phone) return
+    if (!menu || !more || !shown || phone) return
+    const content = document.querySelector<HTMLElement>('[data-testid="bar-more-menu"]')
+    if (!content) {
+      const frame = requestAnimationFrame(() => setLooked((n) => n + 1))
+      return () => cancelAnimationFrame(frame)
+    }
     const update = () => {
       const width = document.documentElement.clientWidth
       const reach = (selector: string) => {
@@ -189,19 +197,46 @@ function useFullMenuPlace(
       const rail = reach('[data-testid="rail"]')
       const past = Math.max(rail, reach('#editor-flyout'))
       const anchor = menu.getBoundingClientRect()
+      const dots = more.getBoundingClientRect()
       const need = content.offsetWidth + MENU_GAP
       // Beside it on its end side only with room for the widest menu beside its rows too, which opens that way.
       const endRoom = (rtl ? anchor.left - CLEAR : width - CLEAR - anchor.right) - WIDE_MENU - MENU_GAP
       const startRoom = rtl ? width - past - anchor.right : anchor.left - past
       const side = endRoom >= need ? 'end' : startRoom >= need ? 'start' : 'under'
       const startInset = side !== 'under' || width - CLEAR - past >= content.offsetWidth ? past : rail
-      setAt((now) => (now.side === side && now.startInset === startInset ? now : { side, startInset }))
+      // From ⋯ to the small menu's edge the menu opens past, and along it to where the menu lines up.
+      const [left, right] = [dots.left - anchor.left, anchor.right - dots.right]
+      const beside = side === 'under' ? anchor.bottom - dots.bottom : (side === 'end') !== rtl ? right : left
+      const along =
+        side === 'under'
+          ? Math.round(anchor.left - dots.left + (anchor.width - content.offsetWidth) / 2)
+          : anchor.top - dots.top
+      setAt((now) =>
+        now.side === side && now.startInset === startInset && now.beside === beside && now.along === along
+          ? now
+          : { side, startInset, beside, along },
+      )
     }
     update()
     window.addEventListener('resize', update)
     return () => window.removeEventListener('resize', update)
-  }, [menu, content, place, phone, rtl, flyoutEnd])
-  return at
+  }, [menu, more, shown, place, phone, rtl, flyoutEnd, looked])
+  const under = at.side === 'under'
+  // Wholly inside the room between the top bar, the bottom controls and the rail with its flyout,
+  // even moving off ⋯.
+  return {
+    side: under ? 'bottom' : rtl !== (at.side === 'start') ? 'left' : 'right',
+    align: 'start',
+    sideOffset: MENU_GAP + at.beside,
+    alignOffset: at.along,
+    sticky: 'always',
+    collisionPadding: {
+      top: barBottom + 8,
+      bottom: 72,
+      left: rtl ? CLEAR : at.startInset,
+      right: rtl ? at.startInset : CLEAR,
+    },
+  }
 }
 
 export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: boolean }) {
@@ -210,16 +245,13 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
   const ids = useSelection(editor)
   const selected = useTarget(editor, ids)
   const [menu, setMenu] = useState<HTMLDivElement | null>(null)
-  const [content, setContent] = useState<HTMLDivElement | null>(null)
   const place = usePlace(editor, menu, rightClick)
-  const { open, barBottom } = useEditState()
-  const moreFocus = useMenuFocus()
-  const escape = useEscapeBack()
+  const { open } = useEditState()
+  const [more, setMore] = useState<HTMLButtonElement | null>(null)
   const rtl = dirOf(useLocale()) === 'rtl'
   const phone = usePhone()
   const focused = useRovingTab(menu)
-  const fullMenu = useFullMenuPlace(menu, content, place, phone, rtl)
-  const scroll = useScrollingMenu(setContent)
+  const fullMenu = useFullMenuPlace(menu, more, open === 'more', place, phone, rtl)
   const [toldWhy, setToldWhy] = useState(false)
   if (!selected) return null
   const { target, design } = selected
@@ -232,10 +264,9 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
   const hidden = target.props.every((props) => props.visible === false)
   const withKey = (label: string, action: Parameters<typeof keyOf>[0]) =>
     format(t.editor.arrange.withKey, { label, key: keyOf(action) })
-  const under = fullMenu.side === 'under'
   // On a phone the full menu is a sheet, and the small menu hides while it shows, as the mock draws it.
   const sheet = phone && open === 'more'
-  const toolbar = (
+  return (
     <div
       ref={setMenu}
       role="toolbar"
@@ -316,62 +347,34 @@ export function SmallMenu({ editor, rightClick }: { editor: Editor; rightClick: 
       >
         {hidden ? <EyeSlashIcon size={16} weight="fill" aria-hidden /> : <EyeIcon size={16} aria-hidden />}
       </button>
-      <Popover.Trigger asChild>
-        <button
-          ref={moreFocus.button}
-          type="button"
-          data-bar-item
-          aria-label={b.more}
-          title={b.more}
-          data-testid="bar-more"
-          className={cn(BAR_BUTTON, PILL_BUTTON)}
-        >
-          <DotsThreeIcon size={18} weight="bold" aria-hidden />
-        </button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content
-          ref={scroll.ref}
-          onScroll={scroll.onScroll}
-          // On a phone the sheet; elsewhere beside the small menu, or under it with no room beside it,
-          // wholly inside the room between the top bar, the bottom controls and the rail with its
-          // flyout, even moving off its button.
-          {...(phone
-            ? SHEET_PLACE
-            : {
-                side: under ? 'bottom' : rtl !== (fullMenu.side === 'start') ? 'left' : 'right',
-                align: under ? 'center' : 'start',
-                sideOffset: MENU_GAP,
-                sticky: 'always',
-                collisionPadding: {
-                  top: barBottom + 8,
-                  bottom: 72,
-                  left: rtl ? CLEAR : fullMenu.startInset,
-                  right: rtl ? fullMenu.startInset : CLEAR,
-                },
-              })}
-          {...moreFocus.content}
-          onEscapeKeyDown={escape.onEscapeKeyDown}
-          onKeyDown={arrowThrough}
-          aria-label={b.more}
-          data-testid="bar-more-menu"
-          data-menu
-          className={cn(
-            MENU,
-            phone ? SHEET_LOOK : 'max-h-[var(--radix-popover-content-available-height)] w-80 overflow-y-auto',
-            scroll.className,
-          )}
-        >
-          {moreFocus.back}
-          {escape.rows(<LayerActions editor={editor} ids={ids} onDone={() => setOpen(null)} />)}
-        </Popover.Content>
-      </Popover.Portal>
+      <Menu
+        trigger={
+          <button
+            ref={setMore}
+            type="button"
+            data-bar-item
+            aria-label={b.more}
+            title={b.more}
+            data-testid="bar-more"
+            className={cn(BAR_BUTTON, PILL_BUTTON)}
+          >
+            <DotsThreeIcon size={18} weight="bold" aria-hidden />
+          </button>
+        }
+        open={open === 'more'}
+        onOpenChange={(to) => {
+          // A row that opened something else keeps it open.
+          if (to) setOpen('more')
+          else if (editState().open === 'more') setOpen(null)
+        }}
+        label={b.more}
+        testId="bar-more-menu"
+        sheet
+        place={fullMenu}
+        className="w-80"
+      >
+        <LayerActions editor={editor} ids={ids} onDone={() => setOpen(null)} />
+      </Menu>
     </div>
-  )
-  return (
-    <Popover.Root open={open === 'more'} onOpenChange={(to) => setOpen(to ? 'more' : null)}>
-      {phone && <SheetAnchor />}
-      {phone ? toolbar : <Popover.Anchor asChild>{toolbar}</Popover.Anchor>}
-    </Popover.Root>
   )
 }

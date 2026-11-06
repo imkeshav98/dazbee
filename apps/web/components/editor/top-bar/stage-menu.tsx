@@ -4,19 +4,16 @@
 // hidden layers at one on empty canvas, for the frame there or the one nearest it outside every
 // frame, when it has some. It opens at the right-click, or on a phone as the sheet at the bottom of
 // the screen, as the full menu does.
-import * as Popover from '@radix-ui/react-popover'
-import { useEffect, useState } from 'react'
+import { type ReactElement, useEffect, useState } from 'react'
 
 import { descendants } from '@dazbee/doc'
 import { type Editor, type Frame, type Point, visibleIn } from '@dazbee/editor'
 
-import { setRightClick, useEditState, usePhone } from '@/components/editor/edit-store.ts'
+import { setRightClick, useEditState } from '@/components/editor/edit-store.ts'
 import { useSelection } from '@/components/editor/editor-hooks.ts'
-import { MENU, MENU_ITEM } from '@/components/editor/styles.ts'
-import { cn } from '@/lib/cn.ts'
+import { MenuItem, RightClickMenu } from '@/components/ui/menu.tsx'
 import { useMessages } from '@/lib/i18n/client.tsx'
 
-import { arrowThrough, SHEET_LOOK, SHEET_PLACE, SheetAnchor, useEscapeBack, useScrollingMenu } from './bar-popover.tsx'
 import { LayerActions } from './layer-actions.tsx'
 
 /** The layers hidden in one frame, which a right-click on its empty canvas offers to show. */
@@ -53,28 +50,57 @@ function nearestFrame(editor: Editor, client: Point) {
 }
 
 /**
- * The layer actions at a right-click on the stage, for what it picked, or Show hidden layers at one
- * on empty canvas; it closes once the selection changes.
+ * The layer actions at a right-click on the stage's canvas (`children`), for what it picked, or Show
+ * hidden layers at one on empty canvas, while `hidden` names some; it shows while the stage has a
+ * menu open (`menu`), which the canvas's own right-click opens, and closes once the selection
+ * changes, a row runs, or Esc or a press elsewhere closes it.
  */
 export function StageMenu({
   editor,
-  at,
+  menu,
+  onClose,
+  children,
+}: {
+  editor: Editor | null
+  /** The menu open at the last right-click, with the hidden layers it offers to show; null while none is. */
+  menu: { hidden: HiddenLayers | null } | null
+  onClose: () => void
+  children: ReactElement
+}) {
+  const b = useMessages().editor.bar
+  const { barBottom } = useEditState()
+  const hidden = menu?.hidden ?? null
+  return (
+    <RightClickMenu
+      area={children}
+      open={menu !== null}
+      onOpenChange={(to) => {
+        if (!to) onClose()
+      }}
+      label={hidden ? b.canvasMenu : b.actions}
+      testId="stage-menu"
+      sheet
+      // Kept between the top bar and the bottom controls, scrolling inside when it has less room.
+      place={{ sticky: 'always', collisionPadding: { top: barBottom + 8, bottom: 72, left: 12, right: 12 } }}
+      className={hidden ? 'min-w-52' : 'w-80'}
+    >
+      {editor && menu && <StageMenuRows editor={editor} hidden={hidden} onClose={onClose} />}
+    </RightClickMenu>
+  )
+}
+
+/** The rows of the stage's open right-click menu, closing it once the selection changes. */
+function StageMenuRows({
+  editor,
   hidden,
   onClose,
 }: {
   editor: Editor
-  at: { x: number; y: number }
-  /** The hidden layers of the frame right-clicked, or nearest the right-click, where nothing was picked. */
   hidden: HiddenLayers | null
   onClose: () => void
 }) {
-  const t = useMessages()
-  const b = t.editor.bar
+  const b = useMessages().editor.bar
   const ids = useSelection(editor)
-  const { barBottom } = useEditState()
-  const phone = usePhone()
-  const scroll = useScrollingMenu()
-  const escape = useEscapeBack()
   const [openedFor] = useState(ids)
   useEffect(() => {
     if (ids !== openedFor) onClose()
@@ -84,64 +110,15 @@ export function StageMenu({
     setRightClick(true)
     return () => setRightClick(false)
   }, [])
+  if (!hidden) return <LayerActions editor={editor} ids={ids} onDone={onClose} />
   return (
-    <Popover.Root open onOpenChange={(to) => !to && onClose()}>
-      {phone ? (
-        <SheetAnchor />
-      ) : (
-        <Popover.Anchor asChild>
-          <span aria-hidden className="pointer-events-none absolute size-0" style={{ left: at.x, top: at.y }} />
-        </Popover.Anchor>
-      )}
-      <Popover.Portal>
-        <Popover.Content
-          // On a phone the sheet; elsewhere at the right-click, kept between the top bar and the
-          // bottom controls, scrolling inside when it has less room.
-          {...(phone
-            ? SHEET_PLACE
-            : {
-                side: 'bottom',
-                align: 'start',
-                sideOffset: 2,
-                sticky: 'always',
-                collisionPadding: { top: barBottom + 8, bottom: 72, left: 12, right: 12 },
-              })}
-          // A click elsewhere or Esc closes it; focus given back to a button that just closed does not.
-          onFocusOutside={(event) => event.preventDefault()}
-          onEscapeKeyDown={escape.onEscapeKeyDown}
-          onKeyDown={arrowThrough}
-          aria-label={hidden ? b.canvasMenu : b.actions}
-          data-testid="stage-menu"
-          data-menu
-          ref={scroll.ref}
-          onScroll={scroll.onScroll}
-          className={cn(
-            MENU,
-            phone
-              ? SHEET_LOOK
-              : hidden
-                ? 'min-w-52'
-                : 'max-h-[var(--radix-popover-content-available-height)] w-80 overflow-y-auto',
-            scroll.className,
-          )}
-        >
-          {hidden ? (
-            <button
-              type="button"
-              data-action="showHidden"
-              onClick={() => {
-                editor.setHidden(hidden.ids, false)
-                onClose()
-              }}
-              className={MENU_ITEM}
-            >
-              {b.showHidden}
-            </button>
-          ) : (
-            escape.rows(<LayerActions editor={editor} ids={ids} onDone={onClose} />)
-          )}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+    <MenuItem
+      action="showHidden"
+      label={b.showHidden}
+      onSelect={() => {
+        editor.setHidden(hidden.ids, false)
+        onClose()
+      }}
+    />
   )
 }

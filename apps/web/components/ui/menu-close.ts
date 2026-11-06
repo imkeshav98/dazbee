@@ -1,6 +1,6 @@
 'use client'
 
-// How a menu opened from its own button closes, as the Share menu and the account menu do: on Esc or
+// How a pop-up opened from its own button closes, as Share's forms and the account menu do: on Esc or
 // a press outside it. While it is open it stands over the edit panel, the bar's second row and the
 // stage's selection, so Esc closes it before them, and closes the menu opened last before one opened
 // earlier; a pop-up opened over it, with the focus in it, closes before it.

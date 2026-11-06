@@ -292,17 +292,17 @@ function PageList({ editor, onRemoved }: { editor: Editor; onRemoved: (message: 
                   },
                   {
                     label: g.moveUp,
-                    disabled: i === 0,
+                    why: i === 0 ? g.firstAlready : null,
                     run: () => run('page.move', { id, before: pages[i - 1]?.[0] ?? null }),
                   },
                   {
                     label: g.moveDown,
-                    disabled: i === pages.length - 1,
+                    why: i === pages.length - 1 ? g.lastAlready : null,
                     run: () => run('page.move', { id, before: pages[i + 2]?.[0] ?? null }),
                   },
                   {
                     label: g.remove,
-                    disabled: pages.length === 1,
+                    why: pages.length === 1 ? g.onlyPage : null,
                     danger: true,
                     run: () => {
                       run('page.delete', { id })

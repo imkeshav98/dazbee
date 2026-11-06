@@ -109,7 +109,7 @@ test.describe('pan and zoom', () => {
     await page.keyboard.press('Shift+0')
     await expect(page.getByTestId('zoom')).toHaveText('100%')
     await page.getByTestId('zoom').click()
-    await page.getByTestId('zoom-menu').getByRole('button', { name: 'Zoom to fit' }).click()
+    await page.getByTestId('zoom-menu').getByRole('menuitem', { name: 'Zoom to fit' }).click()
     await drawn(page)
     const fitted = (await camera()).zoom
     expect(fitted).toBeLessThan(1)
@@ -119,11 +119,11 @@ test.describe('pan and zoom', () => {
     await page.getByTestId('zoom').click()
     await page
       .getByTestId('zoom-menu')
-      .getByRole('button', { name: /Zoom to selection/ })
+      .getByRole('menuitem', { name: /Zoom to selection/ })
       .click()
     await expect.poll(async () => (await camera()).zoom).not.toBe(fitted)
     await page.getByTestId('zoom').click()
-    await page.getByTestId('zoom-menu').getByRole('button', { name: /100%/ }).click()
+    await page.getByTestId('zoom-menu').getByRole('menuitem', { name: /100%/ }).click()
     await expect.poll(async () => (await camera()).zoom).toBe(1)
     expect(errors).toEqual([])
   })

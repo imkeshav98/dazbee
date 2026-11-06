@@ -48,13 +48,15 @@ import {
   textFlag,
   textStyle,
 } from '@/components/editor/edit-panel/target.ts'
-import { type PanelId, setOpen, useEditState, usePhone } from '@/components/editor/edit-store.ts'
+import { type PanelId, setOpen, useEditState } from '@/components/editor/edit-store.ts'
 import { ImagePickerButton } from '@/components/editor/image-tool.tsx'
-import { BAR_BUTTON, BAR_DIVIDER, MENU_DIVIDER, MENU_ITEM, MENU_KEY, MIXED_COLOUR } from '@/components/editor/styles.ts'
+import { BAR_BUTTON, BAR_DIVIDER, MIXED_COLOUR } from '@/components/editor/styles.ts'
+import { MENU_DIVIDER, MENU_ITEM, MENU_KEY } from '@/components/ui/looks.ts'
 import { hexOf } from '@/lib/colour.ts'
 import { tidy } from '@/lib/editor/size.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
+import { usePhone } from '@/lib/phone.ts'
 
 import { BarPopover } from './bar-popover.tsx'
 import { AlignRow } from './line-up.tsx'

@@ -18,7 +18,6 @@ import {
   setOpen,
   setSheetTop,
   useEditState,
-  usePhone,
 } from '@/components/editor/edit-store.ts'
 import { useSelection } from '@/components/editor/editor-hooks.ts'
 import { FontChooser } from '@/components/editor/flyouts/font-panel.tsx'
@@ -28,6 +27,7 @@ import { useScrollEdges } from '@/components/ui/scroll-edges.ts'
 import { cn } from '@/lib/cn.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
+import { usePhone } from '@/lib/phone.ts'
 
 import { AutoLayoutPanel } from './auto-layout-panel.tsx'
 import { ColourPanel } from './colour-panel.tsx'

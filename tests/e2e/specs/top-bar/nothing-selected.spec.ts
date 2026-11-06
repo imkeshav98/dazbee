@@ -144,7 +144,7 @@ test('Pages opens from by the zoom pill: it counts the pages and their frames, a
   await expect.poll(() => page.evaluate(() => window.dazbee?.frames().length)).toBe(1)
   // Its menu deletes it, and the toast's Undo brings it back.
   await pages.nth(1).getByRole('button', { name: 'More for Page 2' }).click()
-  await page.getByRole('dialog', { name: 'More for Page 2' }).getByRole('button', { name: 'Delete page' }).click()
+  await page.getByRole('menu', { name: 'More for Page 2' }).getByRole('menuitem', { name: 'Delete page' }).click()
   await expect(pages).toHaveCount(1)
   await expect(button.locator('span:visible')).toHaveText('Pages 1/1')
   await page.getByTestId('removed-toast').getByRole('button', { name: 'Undo' }).click()

@@ -147,7 +147,7 @@ for (const [locale, toward, back] of [
     await expect(sub).toBeVisible()
     await expect(menu.getByTestId('more-copy-back')).toBeFocused()
     await page.keyboard.press('ArrowDown')
-    await expect(sub.getByRole('button').first()).toBeFocused()
+    await expect(sub.getByRole('menuitem').first()).toBeFocused()
     await page.keyboard.press(back)
     await expect(sub).toHaveCount(0)
     await expect(menu.getByTestId('more-copy')).toBeFocused()
@@ -242,7 +242,7 @@ test('the full menu and the right-click menu open as a sheet at the bottom of th
       const menu = await show()
       await entered(menu)
       const label = `${height} ${await menu.getAttribute('data-testid')}`
-      await expect(menu, label).toHaveAttribute('data-sheet', 'true')
+      await expect(menu, label).toHaveAttribute('data-menu-sheet', 'true')
       const box = await boxOf(menu)
       for (const side of ['left', 'right', 'bottom'] as const)
         expect(Math.abs(box[side] - sheet[side]), `${label} ${side}`).toBeLessThanOrEqual(1)

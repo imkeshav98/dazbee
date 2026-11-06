@@ -6,8 +6,7 @@ import { useState } from 'react'
 
 import { useLocale } from '@/lib/i18n/client.tsx'
 import { dirOf } from '@/lib/i18n/index.ts'
-
-import { usePhone } from './edit-store.ts'
+import { usePhone } from '@/lib/phone.ts'
 
 /** The gap, in CSS pixels, between a pop-up and the panel or control it opens beside. */
 const GAP = 12

@@ -6,7 +6,7 @@
 // and a rail flyout and a sheet close each other. And whether something stands over the edit panel
 // and the bar's second row, which Esc closes first; the menu's button a rename field gives the focus
 // back to; and the Share menu's listener for an Export asked from a picked frame's ⋯.
-import { useLayoutEffect, useState, useSyncExternalStore } from 'react'
+import { useSyncExternalStore } from 'react'
 
 import { OVER_PANEL } from '@/components/ui/menu-close.ts'
 
@@ -105,10 +105,10 @@ export function onExportAsked(listener: (frameIds: string[], opener: HTMLElement
 }
 /**
  * Whether something stands over the edit panel and the bar's second row, so Esc closes it first: a
- * modal dialog, such as Keyboard shortcuts, or a menu that closes as `useMenuClose` says, as the
- * Share menu with its cards and the account menu do.
+ * modal dialog, such as Keyboard shortcuts, an open menu, or a pop-up that closes as `useMenuClose`
+ * says, as Share's forms and the account menu do.
  */
-export const overPanel = () => document.querySelector(`dialog:modal, ${OVER_PANEL}`) !== null
+export const overPanel = () => document.querySelector(`dialog:modal, [data-radix-menu-content], ${OVER_PANEL}`) !== null
 
 /** What the top bar has open and where it sits, re-rendering the caller when that changes. */
 export function useEditState() {
@@ -117,23 +117,6 @@ export function useEditState() {
     () => state,
     () => state,
   )
-}
-
-/**
- * Under 640 px wide the editor is laid out for a phone: the edit panel is a sheet and the top bar
- * wraps into two rows. Read before the first paint, so a menu that opens on a phone, as the right-click menu
- * does, never shows a frame laid out for a wider screen first.
- */
-export function usePhone() {
-  const [phone, setPhone] = useState(false)
-  useLayoutEffect(() => {
-    const query = window.matchMedia('(max-width: 639px)')
-    const update = () => setPhone(query.matches)
-    update()
-    query.addEventListener('change', update)
-    return () => query.removeEventListener('change', update)
-  }, [])
-  return phone
 }
 
 function update(change: Partial<EditState>) {

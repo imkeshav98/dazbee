@@ -12,7 +12,7 @@ import { AssetSummary, isVectorAsset } from '@dazbee/schema'
 
 import { useBesidePanel } from '@/components/editor/beside-panel.ts'
 import { useMenuFocus } from '@/components/editor/top-bar/bar-popover.tsx'
-import { DASHED_BUTTON, FOCUS_RING, TOUCH_GAP } from '@/components/ui/looks.ts'
+import { DASHED_BUTTON, FOCUS_RING, POPOVER, TOUCH_GAP } from '@/components/ui/looks.ts'
 import { overlayScroll } from '@/components/ui/overlay-scroll.ts'
 import { Tooltip } from '@/components/ui/tooltip.tsx'
 import { brandPath } from '@/lib/brand-routes.ts'
@@ -22,7 +22,7 @@ import { useMessages } from '@/lib/i18n/client.tsx'
 import { format } from '@/lib/i18n/index.ts'
 import { ASSET_ACCEPT, IMAGE_ACCEPT, sendAsset } from '@/lib/upload-asset.ts'
 
-import { ASSET_TILE, dockTool, POPOVER } from './styles.ts'
+import { ASSET_TILE, dockTool } from './styles.ts'
 
 const PANEL = cn(POPOVER, 'flex max-h-[min(26rem,60dvh)] w-72 flex-col')
 
