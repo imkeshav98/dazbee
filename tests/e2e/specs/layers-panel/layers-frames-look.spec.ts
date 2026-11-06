@@ -287,3 +287,54 @@ test('on a phone a layer picked from its row just above the panel stays clear of
   expect(await page.evaluate(() => window.dazbee?.camera())).toEqual(camera)
   expect(errors).toEqual([])
 })
+
+test('on a phone with the panel open a layer tapped under the bar comes clear of the bar and stays clear of the panel', async ({
+  browser,
+}) => {
+  const { page, errors } = await openSized(browser, { width: 390, height: 844 }, { touch: true })
+  // Headline's top 84 px down the screen at 30%, where the bar's rows will show.
+  await page.evaluate(() => {
+    const editor = window.dazbee
+    const box = editor?.boxOf('head')
+    const camera = editor?.camera()
+    if (!editor || !box || !camera) return
+    const zoomed = { zoom: 0.3, x: camera.x, y: camera.y }
+    editor.setCamera(zoomed)
+    const top = editor.screenPoint(box.x, box.y).y
+    editor.setCamera({ ...zoomed, y: zoomed.y + 84 - top })
+  })
+  await nextFrame(page)
+  const head = await page.evaluate(() => {
+    const box = window.dazbee?.boxOf('head')
+    return box ? window.dazbee?.screenPoint(box.x + box.width / 2, box.y + box.height / 2) : undefined
+  })
+  await page.touchscreen.tap(head?.x ?? 0, head?.y ?? 0)
+  await expect.poll(() => page.evaluate(() => window.dazbee?.selection())).toEqual(['head'])
+  await page.waitForTimeout(500)
+  const panel = await boxOf(page.getByTestId('flyout'))
+  const on = await page.evaluate(() => {
+    const edges = (el: Element | null) => {
+      if (!el?.checkVisibility({ visibilityProperty: true })) return []
+      const { top, bottom } = el.getBoundingClientRect()
+      return [{ top, bottom }]
+    }
+    const box = window.dazbee?.boxOf('head')
+    const editor = window.dazbee
+    return {
+      bar: ['top-bar-row', 'top-bar-overflow'].flatMap((row) =>
+        edges(document.querySelector(`[data-testid="${row}"]`)),
+      ),
+      box:
+        box && editor
+          ? [{ top: editor.screenPoint(box.x, box.y).y, bottom: editor.screenPoint(box.x, box.y + box.height).y }]
+          : [],
+    }
+  })
+  const barBottom = Math.max(...on.bar.map((row) => row.bottom))
+  // The layer comes clear of both rows; it and its size label stay above the panel, so where the
+  // frame's label can't come clear too, it stays under the bar.
+  for (const piece of on.box) expect(piece.top).toBeGreaterThanOrEqual(barBottom)
+  const selected = await page.evaluate(() => window.dazbee?.selectionRect())
+  expect((selected?.y ?? 0) + (selected?.height ?? Infinity)).toBeLessThan(panel.y)
+  expect(errors).toEqual([])
+})

@@ -134,12 +134,16 @@ function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
       // overlay places it in the stage's pixels.
       const label = overlay.querySelector<HTMLElement>('.frame-label[data-active]')
       const top = Math.min(rect.y, label ? Number.parseFloat(label.style.top) : Infinity)
-      const room = floorOf(overlay) - CLEAR - (rect.y + rect.height)
-      const under = Math.min(editState().barBottom + CLEAR - top, room)
+      const under = editState().barBottom + CLEAR - top
       if (under <= 0) return
       const camera = editor.camera()
       // The camera's offset is in screen pixels: adding to it moves the design down.
       editor.setCamera({ ...camera, y: camera.y + under })
+      // The selection's size label, held below the chrome while the selection is under it, follows
+      // the selection once it is clear, so where the selection ends is read after the move.
+      const moved = editor.selectionRect()
+      const past = moved ? moved.y + moved.height - (floorOf(overlay) - CLEAR) : 0
+      if (past > 0) editor.setCamera({ ...camera, y: camera.y + Math.max(0, under - past) })
     }
     if (!press.held) return clear()
     // After the editor has heard the press end, so the stage moves under no press it reads.
