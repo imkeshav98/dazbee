@@ -94,3 +94,17 @@ test('keeps Ungroup live for a group in an auto layout row whose layer takes its
   expect((await node(page, 'mark'))?.parentId).toBe('logo')
   expect(errors).toEqual([])
 })
+
+test('reads Ungroup again when the design changes while the menu is open, as another tab locking the layer', async ({
+  browser,
+}) => {
+  const { page, errors } = await open(browser)
+  await selectLayers(page, ['card'])
+  const more = await moreMenu(page)
+  await expect(rowIn(more, 'ungroup')).not.toHaveAttribute('aria-disabled', 'true')
+  await page.evaluate(() => window.dazbee?.setLocked(['card'], true))
+  await expect(rowIn(more, 'ungroup')).toHaveAttribute('aria-disabled', 'true')
+  await page.evaluate(() => window.dazbee?.setLocked(['card'], false))
+  await expect(rowIn(more, 'ungroup')).not.toHaveAttribute('aria-disabled', 'true')
+  expect(errors).toEqual([])
+})

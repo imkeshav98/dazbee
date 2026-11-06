@@ -8,7 +8,7 @@
 // item that never applies is left out; one with nothing to do is greyed, its tooltip saying why, as
 // Ungroup is while the group or box is locked or auto layout would move what it holds. How the
 // layers sit (order, line up, the turn, text direction) is in the Position panel and the text's Align.
-import { useState } from 'react'
+import { useMemo } from 'react'
 
 import { childrenOf } from '@dazbee/doc'
 import type { Editor, ShortcutAction, UngroupState } from '@dazbee/editor'
@@ -57,8 +57,10 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   const t = useMessages()
   const b = t.editor.bar
   const selected = useTarget(editor, ids)
-  // Asked once as the menu opens: it tries the ungroup on a copy of the design.
-  const [ungroup] = useState(() => editor.ungroupState())
+  // Asked as the menu opens and again whenever the design changes: it tries the ungroup on a copy of it.
+  const shown = selected?.design
+  const key = ids.join(' ')
+  const ungroup = useMemo(() => (shown && key ? editor.ungroupState() : 'none'), [editor, shown, key])
   if (!selected) return null
   const { target, design } = selected
   const run = (action: ShortcutAction) => {
