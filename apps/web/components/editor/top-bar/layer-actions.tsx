@@ -148,6 +148,13 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
           {actionRow('layerToLinked', l.layer, whyOf(linked.layer))}
         </MenuSub>
       )}
+      {actionRow(
+        'selectLinkedCopies',
+        l.selectCopies,
+        linked.select === 'ready'
+          ? null
+          : l.why[linked.select === 'copiesLocked' ? 'copiesLockedApart' : linked.select],
+      )}
       <MenuDivider />
       {row('boxSelection', b.putInBox)}
       {target.types.every((type) => type === 'group' || type === 'box') &&

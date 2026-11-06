@@ -238,6 +238,7 @@ describe('linkedMenu', () => {
       lock: 'lock',
       hide: 'hide',
       delete: 'ready',
+      select: 'ready',
     })
     expect(linkedMenu(design, ['title'], null)).toMatchObject({
       style: 'copiesHaveStyle',
@@ -252,6 +253,15 @@ describe('linkedMenu', () => {
       layer: 'noFrames',
     })
     expect(linkedMenu(design, ['bg', 'badge'], null)).toMatchObject({ copyStyle: 'several', layer: 'ready' })
+  })
+
+  it('says Select copies has nothing to do with no copy on the page, every copy selected or the rest locked', () => {
+    const { session } = harness()
+    expect(linkedMenu(session.design(), ['badge'], null)).toMatchObject({ select: 'noCopies' })
+    expect(linkedMenu(session.design(), ['other-bg'], null)).toMatchObject({ select: 'noCopies' })
+    expect(linkedMenu(session.design(), ['bg', 'wide-bg'], null)).toMatchObject({ select: 'everySelected' })
+    session.run('node.lock', { ids: ['wide-bg'], lock: { move: true } })
+    expect(linkedMenu(session.design(), ['bg'], null)).toMatchObject({ select: 'copiesLocked' })
   })
 
   it('reaches the linked frames that hold a copy, or every linked frame when none does', () => {

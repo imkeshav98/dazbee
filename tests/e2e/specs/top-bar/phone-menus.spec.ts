@@ -7,7 +7,7 @@
 // screen, and a group's fits whole; no row shows the hover tint until a pointer moves over it.
 import { setCookies } from '../../support/editor.ts'
 import { boxOf, layoutProblems } from '../../support/layout.ts'
-import { node, open, rowsOf } from '../../support/linked-menu.ts'
+import { expectGreyed, node, open, rowsOf } from '../../support/linked-menu.ts'
 import {
   besideRows,
   fullMenuRows,
@@ -18,7 +18,8 @@ import {
   shownKeys,
   shownRows,
 } from '../../support/menu-rows.ts'
-import { fitSettled, selectLayers } from '../../support/stage.ts'
+import { copyIn } from '../../support/seed.ts'
+import { fitSettled, selection, selectLayers } from '../../support/stage.ts'
 import { expect, type Locator, type Page, test } from '../../support/test.ts'
 import { entered, moreMenu, PIECES, UNCUT } from '../../support/top-bar.ts'
 
@@ -58,6 +59,38 @@ async function rightClick(page: Page, id: string) {
   await entered(menu)
   return menu
 }
+
+test('Select copies, after Copy to other frames in the full menu and the right-click menu, selects the linked copies in every frame, and is greyed saying why with none on the page', async ({
+  browser,
+}) => {
+  const { page, errors } = await openOnPhone(browser)
+  await selectLayers(page, ['headline'])
+  const menu = await moreMenu(page)
+  const rows = await shownRows(menu)
+  expect(rows[rows.indexOf(rowName('more-copy-to-frames')) + 1]).toBe(rowName('selectLinkedCopies'))
+  await rowIn(menu, 'selectLinkedCopies').click()
+  await expect(menu).toBeHidden()
+  await expect
+    .poll(async () => (await selection(page))?.sort())
+    .toEqual(['headline', copyIn('story', 'headline'), copyIn('wide', 'headline')].sort())
+  // Every copy selected now, the row says so.
+  await expectGreyed(page, await moreMenu(page), rowName('selectLinkedCopies'), 'Every linked copy is selected already')
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('Escape')
+  // A layer with no linked copy on the page.
+  await selectLayers(page, ['fresh-title'])
+  const right = await rightClick(page, 'headline')
+  await expect(rowIn(right, 'selectLinkedCopies')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await selectLayers(page, ['fresh-title'])
+  await expectGreyed(
+    page,
+    await moreMenu(page),
+    rowName('selectLinkedCopies'),
+    'No other frame has a copy of this layer',
+  )
+  expect(errors).toEqual([])
+})
 
 test('a menu beside a row of the full menu opens in its place under a back row naming the row, with nothing of the full menu showing, and the back row goes back to its row', async ({
   browser,
