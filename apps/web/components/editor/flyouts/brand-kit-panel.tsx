@@ -132,7 +132,7 @@ export function BrandKitPanel({ editor, brandId }: { editor: Editor; brandId: st
           {kit.colors.length === 0 ? (
             <p className="text-xs text-muted">{t.noColors}</p>
           ) : (
-            <ul className="grid grid-cols-5 gap-2">
+            <ul className="grid grid-cols-5 gap-[8px]">
               {kit.colors.map((c) => {
                 const on = follows(design, selection, 'color', c.token)
                 return (
