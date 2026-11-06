@@ -13,6 +13,8 @@ import {
 export const API_URL = process.env.API_URL ?? 'http://localhost:8787'
 /** A brand of the development workspace the API seeds (apps/api/src/sign-in/session.ts). */
 export const DEV_BRAND = 'dev-brand-coffee'
+/** The pattern of a short id, as the API makes brand, design, template and asset ids (packages/db's ids). */
+export const SHORT_ID = '[0-9a-z]{12}'
 
 type Node = DesignInput['nodes'][string]
 type FrameInput = DesignInput['frames'][string]

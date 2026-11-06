@@ -1,5 +1,6 @@
 // Designs per brand (#33): made from the brand's home (#84), opened from the API, kept across reloads.
 import { writeOutput } from '../../support/editor.ts'
+import { SHORT_ID } from '../../support/seed.ts'
 import { expect, test } from '../../support/test.ts'
 
 test('a design made from the brand list opens in the editor and is there after a reload', async ({ page }) => {
@@ -17,7 +18,7 @@ test('a design made from the brand list opens in the editor and is there after a
 
   await page.getByLabel('Brief').fill(name)
   await page.getByRole('button', { name: 'Make drafts' }).click()
-  await expect(page).toHaveURL(/\/brands\/dev-brand-coffee\/designs\/[0-9a-z]{12}$/)
+  await expect(page).toHaveURL(new RegExp(`/brands/dev-brand-coffee/designs/${SHORT_ID}$`))
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(name)
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
   const design = await page.evaluate(() => window.dazbee?.design())
@@ -62,11 +63,11 @@ test('a brand with one design counts it in the singular', async ({ page }) => {
   await brands.getByRole('button', { name: 'New brand' }).click()
   await brands.getByRole('textbox', { name: 'Website or name' }).fill(name)
   await brands.getByRole('button', { name: 'Create' }).click()
-  await expect(page).toHaveURL(/\/brands\/[0-9a-z]{12}$/)
+  await expect(page).toHaveURL(new RegExp(`/brands/${SHORT_ID}$`))
   const home = page.url()
   await page.getByLabel('Brief').fill('Only one')
   await page.getByRole('button', { name: 'Make drafts' }).click()
-  await expect(page).toHaveURL(/\/designs\/[0-9a-z]{12}$/, { timeout: 20_000 })
+  await expect(page).toHaveURL(new RegExp(`/designs/${SHORT_ID}$`), { timeout: 20_000 })
 
   await page.goto(`${home}/designs`)
   await expect(page.getByRole('main')).toContainText('1 design')

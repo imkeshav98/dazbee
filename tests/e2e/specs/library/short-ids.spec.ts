@@ -10,12 +10,10 @@ import { designOf, editorPath, openTabs, reloads, settle, writeOutput } from '..
 import { expectNode, openExport, runExport } from '../../support/export.ts'
 import { storeDesign } from '../../support/local-servers.ts'
 import { nameOf, TILE_MENU } from '../../support/menu-rows.ts'
-import { DEV_BRAND, liveDesign } from '../../support/seed.ts'
+import { DEV_BRAND, liveDesign, SHORT_ID } from '../../support/seed.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
-
-const SHORT = '[0-9a-z]{12}'
 
 /** The ids of the frames in the tab's design. */
 const framesOf = async (page: Page) => Object.keys(JSON.parse(await designOf(page)).frames as object)
@@ -58,12 +56,12 @@ test('a design made in a new brand opens at a link of two short ids, its edits r
   await brands.getByRole('button', { name: 'New brand' }).click()
   await brands.getByRole('textbox', { name: 'Website or name' }).fill(brandName)
   await brands.getByRole('button', { name: 'Create' }).click()
-  await expect(page).toHaveURL(new RegExp(`/brands/${SHORT}$`))
+  await expect(page).toHaveURL(new RegExp(`/brands/${SHORT_ID}$`))
   const brandId = new URL(page.url()).pathname.split('/')[2] ?? ''
 
   await page.getByLabel('Brief').fill(name)
   await page.getByRole('button', { name: 'Make drafts' }).click()
-  await expect(page).toHaveURL(new RegExp(`/brands/${brandId}/designs/${SHORT}$`), { timeout: 20_000 })
+  await expect(page).toHaveURL(new RegExp(`/brands/${brandId}/designs/${SHORT_ID}$`), { timeout: 20_000 })
   await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 30_000 })
   const designId = new URL(page.url()).pathname.split('/')[4] ?? ''
   writeOutput('short-ids-1-editor.png', await page.screenshot())
@@ -87,7 +85,7 @@ test('a design made in a new brand opens at a link of two short ids, its edits r
   // The tile's menu opens over the page, outside the tile.
   await page.getByRole('menuitem', { name: nameOf(TILE_MENU, 'duplicate') }).click()
   const copy = page.getByTestId('design-tile').filter({ hasText: `${name} copy` })
-  await expect(copy).toHaveAttribute('data-design', new RegExp(`^${SHORT}$`))
+  await expect(copy).toHaveAttribute('data-design', new RegExp(`^${SHORT_ID}$`))
   const copyId = (await copy.getAttribute('data-design')) ?? ''
   expect(copyId).not.toBe(designId)
   await page.goto(editorPath(copyId, { brandId }))
