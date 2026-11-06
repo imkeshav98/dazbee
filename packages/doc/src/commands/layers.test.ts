@@ -109,6 +109,19 @@ describe('node.update', () => {
     expect(inFrame('f2')).toEqual({ own: { ...f2.own, props: { ...f2.own?.props, x: 40 } } })
   })
 
+  it('writes nothing and adds no undo step when every value is the one the layer has, as an image replaced by itself', () => {
+    const doc = testDoc()
+    const tab = openTestSession(doc)
+    tab.run('node.update', { ids: ['box'], patch: { x: 140 } })
+    const { fills } = readDesign(doc).nodes.box?.props as { fills: unknown[] }
+    let writes = 0
+    doc.on('update', () => writes++)
+    tab.run('node.update', { ids: ['box'], patch: { x: 140, fills: structuredClone(fills) } })
+    expect(writes).toBe(0)
+    tab.undo()
+    expect(readDesign(doc).nodes.box?.props).toMatchObject({ x: 100 })
+  })
+
   it('refuses a patch that would make the layer invalid, and text, which text.edit changes', () => {
     const tab = openTestSession(testDoc())
     expect(() => tab.run('node.update', { ids: ['box'], patch: { opacity: 2 } })).toThrow(/node.update: box.opacity/)
