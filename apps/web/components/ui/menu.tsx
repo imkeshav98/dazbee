@@ -152,8 +152,13 @@ function useWatchKeys() {
   useEffect(() => {
     if (watching) return
     watching = true
-    window.addEventListener('keydown', () => (keyed = true), true)
-    window.addEventListener('pointerdown', () => (keyed = false), true)
+    // The page's mark says the same, so a menu's rows ring only for the keyboard (app/globals.css).
+    const press = (byKey: boolean) => {
+      keyed = byKey
+      document.documentElement.dataset.input = byKey ? 'key' : 'pointer'
+    }
+    window.addEventListener('keydown', () => press(true), true)
+    window.addEventListener('pointerdown', () => press(false), true)
     // A press let go anywhere ends, once the row it was let go over has had it.
     window.addEventListener('pointerup', () => (pressedRow = null))
   }, [])

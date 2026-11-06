@@ -272,6 +272,14 @@ body {
   min-width: 0 !important;
 }
 
+/*
+ * A menu's row the pointer moved onto has the focus (Radix moves it there) but no keyboard ring,
+ * which the browser may draw for it after a press elsewhere: rows ring only after a key.
+ */
+[data-input='pointer'] [data-radix-menu-content] [role^='menuitem']:focus-visible {
+  outline: none;
+}
+
 /* The hover or pressed tint laid over a control's own fill, which stays: a card's row or boxed button
    under the pointer or pressed, and a glass button that is open. */
 @utility tint-hover {
