@@ -179,9 +179,15 @@ function useFullMenuPlace(
 ): MenuPlace {
   const [at, setAt] = useState<FullMenuPlace>({ side: 'end', startInset: CLEAR, beside: 0, along: 0 })
   const { flyoutEnd, barBottom } = useEditState()
+  // Bumped while the full menu is shown but not yet in the page: its portal puts it there a render later.
+  const [looked, setLooked] = useState(0)
   useLayoutEffect(() => {
-    const content = shown ? document.querySelector<HTMLElement>('[data-testid="bar-more-menu"]') : null
-    if (!menu || !more || !content || phone) return
+    if (!menu || !more || !shown || phone) return
+    const content = document.querySelector<HTMLElement>('[data-testid="bar-more-menu"]')
+    if (!content) {
+      const frame = requestAnimationFrame(() => setLooked((n) => n + 1))
+      return () => cancelAnimationFrame(frame)
+    }
     const update = () => {
       const width = document.documentElement.clientWidth
       const reach = (selector: string) => {
@@ -214,7 +220,7 @@ function useFullMenuPlace(
     update()
     window.addEventListener('resize', update)
     return () => window.removeEventListener('resize', update)
-  }, [menu, more, shown, place, phone, rtl, flyoutEnd])
+  }, [menu, more, shown, place, phone, rtl, flyoutEnd, looked])
   const under = at.side === 'under'
   // Wholly inside the room between the top bar, the bottom controls and the rail with its flyout,
   // even moving off ⋯.

@@ -16,6 +16,7 @@ import {
   createContext,
   type FocusEvent,
   type KeyboardEvent,
+  type PointerEvent,
   type ReactElement,
   type ReactNode,
   type RefObject,
@@ -77,6 +78,25 @@ const ROOM = {
 }
 
 const SharedContext = createContext<Shared | null>(null)
+
+/** The row a pointer is pressed on now, if one is. */
+let pressedRow: EventTarget | null = null
+
+/**
+ * A row's pointer handlers so that only a press that starts on the row runs it. Radix also runs the
+ * row a pointer is let go over after a press elsewhere, as when the press that opened its menu
+ * lands on the menu: on a phone the sheet covers its button, and a tap on the button would run the
+ * row under the finger.
+ */
+const PRESS = {
+  onPointerDown: (event: PointerEvent<HTMLElement>) => {
+    pressedRow = event.currentTarget
+  },
+  onPointerUp: (event: PointerEvent<HTMLElement>) => {
+    if (pressedRow !== event.currentTarget) event.preventDefault()
+    pressedRow = null
+  },
+}
 
 /** Whether nothing has the focus, as when the focused row of a menu that closed has left the page. */
 const nowhere = () => document.activeElement === null || document.activeElement === document.body
@@ -272,6 +292,7 @@ export function MenuItem({
         {...(checked === undefined ? {} : { role: 'menuitemcheckbox', 'aria-checked': checked })}
         aria-disabled={why ? 'true' : undefined}
         aria-description={why ?? undefined}
+        {...PRESS}
         onPointerLeave={why ? tip.leave : undefined}
         className={cn(look, danger && 'text-danger', className, why && MENU_ITEM_GREYED)}
       >
@@ -310,7 +331,7 @@ export function MenuCheck({
       onCheckedChange={onCheckedChange}
       onSelect={(event) => event.preventDefault()}
     >
-      <button type="button" className={MENU_ITEM}>
+      <button type="button" {...PRESS} className={MENU_ITEM}>
         {label}
         {keys && <kbd className={cn(MENU_KEY, 'ms-auto me-2')}>{keys}</kbd>}
         {mark}
@@ -356,7 +377,7 @@ export function MenuRadio({
   const { parts } = useShared()
   return (
     <parts.RadioItem asChild value={value} textValue={label}>
-      <button type="button" {...rest} className={className ?? MENU_ITEM}>
+      <button type="button" {...rest} {...PRESS} className={className ?? MENU_ITEM}>
         {children}
       </button>
     </parts.RadioItem>
@@ -418,6 +439,7 @@ export function MenuSub({
           ref={row}
           type="button"
           data-testid={testId}
+          {...PRESS}
           className={cn(MENU_ITEM, 'data-[state=open]:bg-hover data-[state=open]:lit')}
         >
           {label}
@@ -431,9 +453,11 @@ export function MenuSub({
           loop
           aria-label={label}
           data-testid={`${testId}-menu`}
-          // Esc closes this menu alone, back onto its row; the next closes the menu it is beside.
+          // Esc closes this menu alone, back onto its row, and goes no further; the next closes the
+          // menu it is beside.
           onEscapeKeyDown={(event) => {
             event.preventDefault()
+            event.stopPropagation()
             setOpen(false)
             row.current?.focus()
           }}
@@ -482,7 +506,9 @@ function MenuContent({
         {...(sheet ? {} : place)}
         ref={scroll.ref}
         onScroll={scroll.onScroll}
+        // Named by its own words, not its button's: Share's menu is "Share and export".
         aria-label={label}
+        aria-labelledby={undefined}
         data-testid={testId}
         data-menu
         data-sheet={sheet || undefined}
@@ -502,13 +528,13 @@ function MenuContent({
           entered.current = false
           if (!nowhere()) event.preventDefault()
         }}
-        // Back from a row's menu shown in its place, first. That Esc goes no further: going back takes
-        // the focused row out of the page, and the stage would take an Esc from outside a menu as its
-        // own and let the selection go.
+        // Back from a row's menu shown in its place first, else closing the menu. Either way that Esc
+        // goes no further: it takes the focused row out of the page, and the stage would take an Esc
+        // from outside a menu as its own and let the selection go.
         onEscapeKeyDown={(event) => {
+          event.stopPropagation()
           if (!back.current) return
           event.preventDefault()
-          event.stopPropagation()
           back.current()
         }}
         className={cn(MENU, dropdown ? ROOM.dropdown : ROOM.context, className, scroll.className, sheet && SHEET)}
@@ -568,9 +594,13 @@ function SubInPlace({ label, testId, children }: { label: string; testId: string
           type="button"
           aria-haspopup="menu"
           data-testid={testId}
+          {...PRESS}
+          // The arrow that opens it goes no further: opening takes this row out of the page, and the
+          // stage would take an arrow from outside a menu as its own and nudge the selection.
           onKeyDown={(event) => {
             if (event.key !== arrows.toward) return
             event.preventDefault()
+            event.stopPropagation()
             show(true)
           }}
           className={MENU_ITEM}
@@ -606,6 +636,7 @@ function SubInPlace({ label, testId, children }: { label: string; testId: string
           type="button"
           data-testid={`${testId}-back`}
           aria-label={format(t.menu.backFrom, { menu: label })}
+          {...PRESS}
           className={cn(MENU_ITEM, 'justify-start gap-1.5')}
         >
           <CaretLeftIcon size={12} weight="bold" aria-hidden className="text-subtle rtl:-scale-x-100" />
