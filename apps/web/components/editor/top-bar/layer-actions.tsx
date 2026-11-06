@@ -16,6 +16,7 @@ import type { Design } from '@dazbee/schema'
 
 import { keyOf } from '@/components/editor/arrange-actions.ts'
 import { useTarget } from '@/components/editor/edit-panel/target.ts'
+import { useLiveDesign } from '@/components/editor/use-live-design.ts'
 import { MenuDivider, MenuItem, MenuSub } from '@/components/ui/menu.tsx'
 import { useMessages } from '@/lib/i18n/client.tsx'
 import { format, type Messages } from '@/lib/i18n/index.ts'
@@ -58,9 +59,9 @@ export function LayerActions({ editor, ids, onDone }: { editor: Editor; ids: str
   const b = t.editor.bar
   const selected = useTarget(editor, ids)
   // Asked as the menu opens and again whenever the design changes: it tries the ungroup on a copy of it.
-  const shown = selected?.design
+  const { version } = useLiveDesign(editor)
   const key = ids.join(' ')
-  const ungroup = useMemo(() => (shown && key ? editor.ungroupState() : 'none'), [editor, shown, key])
+  const ungroup = useMemo(() => (key ? editor.ungroupState() : 'none'), [editor, version, key])
   if (!selected) return null
   const { target, design } = selected
   const run = (action: ShortcutAction) => {
