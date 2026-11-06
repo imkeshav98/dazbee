@@ -14,6 +14,12 @@ export interface Box {
   bottom: number
 }
 
+/** The screen a tooltip shows on: whether the page reads right to left, and whether it is a phone's. */
+export interface TipScreen {
+  rtl: boolean
+  phone: boolean
+}
+
 /**
  * Where a tooltip goes, as Radix takes it: the side of its row, how it lines up along it, and how
  * far from the row it keeps, which reaches past the row's own menu when it goes above or below it.
@@ -32,10 +38,10 @@ const ALIGNS = ['start', 'center', 'end'] as const
 
 /**
  * The first place that fits in the window and covers none of `rows`, trying beside the row at its
- * end, then at its start, then past the top and the bottom of its own menu (`own`), or on a `phone`
- * only past the top and the bottom of its menu; when each covers some, the one that covers least.
- * `rtl` puts the end on the left, and lines a tooltip's start up with the row's right edge, as Radix
- * does in a right-to-left page.
+ * end, then at its start, then past the top and the bottom of its own menu (`own`), or on a phone only past the top and the bottom of its
+ * menu; when each covers some, the one that covers least. A right-to-left screen puts the end on the
+ * left, and lines a tooltip's start up with the row's right edge, as Radix does in a right-to-left
+ * page.
  */
 export function tooltipPlace({
   row,
@@ -43,9 +49,8 @@ export function tooltipPlace({
   own,
   rows,
   room,
-  rtl,
-  phone = false,
-  nearer = false,
+  screen: { rtl, phone },
+  panel,
 }: {
   row: Box
   size: { width: number; height: number }
@@ -54,11 +59,13 @@ export function tooltipPlace({
   /** Every row that shows in the open menus, the row's own menu, its back row and the row itself included. */
   rows: readonly Box[]
   room: { width: number; height: number }
-  rtl: boolean
-  /** The screen is a phone's, tapped with a finger: the tooltip goes past its menu, clear of every row. */
-  phone?: boolean
-  /** Past its menu, the side nearer the row comes first, as in the edit panel's grids of controls. */
-  nearer?: boolean
+  /** On a phone's screen, tapped with a finger, the tooltip goes past its menu, clear of every row. */
+  screen: TipScreen
+  /**
+   * The edit panel, when the row is a control in one of its grids (`own`): past the grid, the side
+   * nearer the row comes first.
+   */
+  panel?: Box
 }): TooltipPlace {
   const [end, start] = rtl ? (['left', 'right'] as const) : (['right', 'left'] as const)
   const pastMenu: TooltipPlace[] = [
@@ -70,7 +77,7 @@ export function tooltipPlace({
     { side: start, align: 'center', offset: GAP },
   ]
   let best: { place: TooltipPlace; covered: number } | null = null
-  const past = nearer && !phone ? [...pastMenu].sort((one, other) => one.offset - other.offset) : pastMenu
+  const past = panel && !phone ? [...pastMenu].sort((one, other) => one.offset - other.offset) : pastMenu
   for (const place of phone ? pastMenu : [...beside, ...past]) {
     const box = tooltipBox(place, row, size, room, rtl)
     if (!box) continue
