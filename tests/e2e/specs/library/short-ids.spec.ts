@@ -8,12 +8,24 @@ import { parseDesign } from '@dazbee/schema'
 
 import { designOf, editorPath, openTabs, reloads, settle, writeOutput } from '../../support/editor.ts'
 import { expectNode, openExport, runExport } from '../../support/export.ts'
-import { storeDesign } from '../../support/local-servers.ts'
+import { query } from '../../support/local-servers.ts'
 import { nameOf, TILE_MENU } from '../../support/menu-rows.ts'
 import { DEV_BRAND, liveDesign, SHORT_ID } from '../../support/seed.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 
 test.describe.configure({ timeout: 120_000 })
+
+/**
+ * Stores a design in a brand's workspace under the id given, with its Yjs state, straight into the
+ * sync server's database (packages/db's designs and design_states), as the API stores one it makes.
+ */
+function storeDesign(id: string, brandId: string, name: string, state: Uint8Array) {
+  const text = (value: string) => `'${value.replace(/'/g, "''")}'`
+  query(
+    `insert into designs (id, workspace_id, brand_id, name) select ${text(id)}, workspace_id, id, ${text(name)} from brands where id = ${text(brandId)}; ` +
+      `insert into design_states (design_id, state) values (${text(id)}, decode('${Buffer.from(state).toString('hex')}', 'hex'))`,
+  )
+}
 
 /** The ids of the frames in the tab's design. */
 const framesOf = async (page: Page) => Object.keys(JSON.parse(await designOf(page)).frames as object)
