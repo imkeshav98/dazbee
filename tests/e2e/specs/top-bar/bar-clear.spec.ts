@@ -152,6 +152,7 @@ test('on a phone a press that selects a layer and drags it is not followed by a 
     ['photo', 0.5, 10, 4],
     ['headline', 1, 4, 1],
     ['headline', 1, 2, 1],
+    ['box', 1, 2, 1],
   ] as const) {
     await selectLayers(page, [])
     // The layer's top 100 px down the screen, under where the bar's rows will be, pressed a little
@@ -177,9 +178,7 @@ test('on a phone a press that selects a layer and drags it is not followed by a 
     expect(await page.evaluate(() => window.dazbee?.selection()), id).toEqual([id])
     const after = await page.evaluate((id) => window.dazbee?.boxOf(id), id)
     if (steps * by >= 10) expect((after?.y ?? 0) - before.y, `${id}: moved with the finger`).toBeGreaterThan(20)
-    // A drag of a few pixels may leave the layer where it was, a tap, which the stage then clears.
-    if (JSON.stringify(after) !== JSON.stringify(before))
-      expect(await page.evaluate(() => window.dazbee?.camera()), `${id}: no move after the drag`).toEqual(camera)
+    expect(await page.evaluate(() => window.dazbee?.camera()), `${id}: no move after the drag`).toEqual(camera)
   }
   expect(errors).toEqual([])
   await page.context().close()
@@ -269,6 +268,47 @@ test('on a phone a tap on the bar just after a tap that selected a layer under i
   await page.touchscreen.tap(colour.x + colour.width / 2, colour.y + colour.height / 2)
   await expect(page.getByTestId('bar-colour-menu')).toBeVisible()
   expect(await page.evaluate(() => window.dazbee?.selection())).toEqual(['box'])
+  expect(errors).toEqual([])
+  await page.context().close()
+})
+
+test('on a phone a drag straight after a tap, one the layer does not follow included, is not followed by a move', async ({
+  browser,
+}) => {
+  const { page, errors } = await openPhone(browser, designId)
+  const touch = await page.context().newCDPSession(page)
+  const touchAt = (type: 'touchStart' | 'touchMove' | 'touchEnd', at?: { x: number; y: number }) =>
+    touch.send('Input.dispatchTouchEvent', { type, touchPoints: at ? [at] : [] })
+  // 4 px right, which snapping holds the box against, and 20 px out and back.
+  for (const moves of [
+    [1, 2, 3, 4],
+    [5, 10, 15, 20, 15, 10, 5, 0],
+  ]) {
+    await selectLayers(page, [])
+    // The box's top 100 px down the screen at 50%, under where the bar's rows will be.
+    const at = await page.evaluate(() => {
+      const editor = window.dazbee
+      const box = editor?.boxOf('box')
+      if (!editor || !box) throw new Error('no box')
+      editor.setCamera({ ...editor.camera(), zoom: 0.5 })
+      const now = editor.camera()
+      const was = editor.screenPoint(box.x + box.width / 2, box.y)
+      editor.setCamera({ ...now, x: now.x + 195 - was.x, y: now.y + 100 - was.y })
+      return { x: 195, y: 130 }
+    })
+    await nextFrame(page)
+    await touchAt('touchStart', at)
+    await touchAt('touchEnd')
+    await page.waitForTimeout(100)
+    await touchAt('touchStart', at)
+    const camera = await page.evaluate(() => window.dazbee?.camera())
+    for (const dx of moves) await touchAt('touchMove', { x: at.x + dx, y: at.y })
+    await touchAt('touchEnd')
+    await page.waitForTimeout(800)
+    expect(await page.evaluate(() => window.dazbee?.camera()), `${moves.join(' ')}: no move after the drag`).toEqual(
+      camera,
+    )
+  }
   expect(errors).toEqual([])
   await page.context().close()
 })
