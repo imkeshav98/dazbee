@@ -1,8 +1,9 @@
 // Where the small menu sits by the selection, on the stage: above it, else below it, else under
 // the top bar. Each place is tried centred on the selection first, so a label over the selection
 // sends the menu below it rather than sideways; only then does a place move sideways off what it
-// would cover, and never so far that the menu no longer overlaps the selection. Null while no
-// place is free.
+// would cover, and never so far that the menu no longer overlaps the selection. While all of those
+// are covered, it goes just past what covers the place below, else above, so it never hides for
+// want of room; null only while that leaves the stage too.
 
 /** A box on the stage, in pixels from its top start corner. */
 export type Box = { left: number; top: number; right: number; bottom: number }
@@ -22,7 +23,7 @@ const OVERLAP = 24
 const clampInto = (value: number, low: number, high: number) => Math.max(low, Math.min(value, high))
 const meets = (a: Box, b: Box) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom
 
-/** Where the menu goes for a selection, or null while every place by it is covered. */
+/** Where the menu goes for a selection, or null while no place on the stage is free. */
 export function smallMenuPlace({
   rect,
   width,
@@ -63,9 +64,27 @@ export function smallMenuPlace({
     if (left !== null) return { left: Math.round(left), top }
   }
   const top = Math.round(under)
-  if (!fits(top)) return null
-  const left = free(centred, top) ? centred : slid(centred, top)
-  return left === null ? null : { left: Math.round(left), top }
+  const left = !fits(top) ? null : free(centred, top) ? centred : slid(centred, top)
+  if (left !== null) return { left: Math.round(left), top }
+  // Every place by it is covered: just past what covers the place below, else above.
+  for (const way of [1, -1] as const) {
+    const at = pushed(way === 1 ? rect.y + rect.height + GAP : rect.y - height - GAP, way)
+    if (at !== null) return { left: Math.round(centred), top: Math.round(at) }
+  }
+  return null
+
+  /** From `from`, past each thing the centred menu would cover, downwards or upwards; null once off the room. */
+  function pushed(from: number, way: 1 | -1) {
+    let at = from
+    for (let tries = 0; tries < 4 && fits(at); tries++) {
+      const hits = blocked.filter((b) =>
+        meets({ left: centred, top: at, right: centred + width, bottom: at + height }, b),
+      )
+      if (hits.length === 0) return at
+      at = way === 1 ? Math.max(...hits.map((b) => b.bottom)) : Math.min(...hits.map((b) => b.top)) - height
+    }
+    return fits(at) && free(centred, at) ? at : null
+  }
 
   /** Moves sideways off what the menu would cover, the shorter way, kept by the selection; null while it still covers something. */
   function slid(from: number, top: number) {

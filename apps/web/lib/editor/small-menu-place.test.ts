@@ -53,4 +53,34 @@ describe('smallMenuPlace', () => {
     const rect = { x: 100, y: 20, width: 1000, height: 730 }
     expect(smallMenuPlace({ ...BASE, rect, blocked: [BAR] })).toEqual({ left: 517, top: 136 })
   })
+
+  it('goes just past what covers the place below, then above, while every place by the selection and under the bar is covered, as on a phone', () => {
+    // Copies selected on a 390×844 phone: the frames' labels above, the bar's two rows, a label just below.
+    const kept = (left: number, top: number, right: number, bottom: number): Box => ({
+      left: left - 8,
+      top: top - 8,
+      right: right + 8,
+      bottom: bottom + 8,
+    })
+    const blocked = [
+      kept(31, 72, 359, 122),
+      kept(144, 127, 246, 177),
+      kept(16, 198, 119, 218),
+      kept(138, 198, 241, 218),
+      kept(260, 198, 374, 218),
+      kept(16, 407, 119, 427),
+      kept(51, 723, 340, 771),
+    ]
+    const rect = { x: 73, y: 253, width: 38, height: 66 }
+    const place = smallMenuPlace({
+      rect,
+      width: 261,
+      height: 53,
+      room: { width: 390, height: 844 },
+      blocked,
+      floor: 832,
+      under: 185,
+    })
+    expect(place).toEqual({ left: 8, top: 435 })
+  })
 })
