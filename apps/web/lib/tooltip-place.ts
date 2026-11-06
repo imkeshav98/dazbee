@@ -1,7 +1,8 @@
 // Where a greyed menu row's tooltip goes so it covers no row of any open menu, its own menu's and a
 // back row included. On tablet and desktop it goes beside the row, at its end when the window has
 // room there, else at its start; otherwise past the top or the bottom of the row's own menu, lined
-// up with the row's start, middle or end. On a phone it goes just above the row's menu (the sheet),
+// up with the row's start, middle or end. A control in the edit panel's grids tries beside the panel
+// too, level with the control, before past its grid. On a phone it goes just above the row's menu (the sheet),
 // clear of every row and of the finger that tapped it, and below the menu only when the room above
 // can't hold it. Whichever comes first that fits the window and covers no row wins; when each
 // covers some, the one that covers least.
@@ -38,7 +39,8 @@ const ALIGNS = ['start', 'center', 'end'] as const
 
 /**
  * The first place that fits in the window and covers none of `rows`, trying beside the row at its
- * end, then at its start, then past the top and the bottom of its own menu (`own`), or on a phone only past the top and the bottom of its
+ * end, then at its start, then beside the edit panel (`panel`) level with the row, then past the top
+ * and the bottom of its own menu (`own`), or on a phone only past the top and the bottom of its
  * menu; when each covers some, the one that covers least. A right-to-left screen puts the end on the
  * left, and lines a tooltip's start up with the row's right edge, as Radix does in a right-to-left
  * page.
@@ -62,8 +64,8 @@ export function tooltipPlace({
   /** On a phone's screen, tapped with a finger, the tooltip goes past its menu, clear of every row. */
   screen: TipScreen
   /**
-   * The edit panel, when the row is a control in one of its grids (`own`): past the grid, the side
-   * nearer the row comes first.
+   * The edit panel, when the row is a control in one of its grids (`own`): the tooltip may sit
+   * beside the panel level with the row, and past the grid the side nearer the row comes first.
    */
   panel?: Box
 }): TooltipPlace {
@@ -75,6 +77,20 @@ export function tooltipPlace({
   const beside: TooltipPlace[] = [
     { side: end, align: 'center', offset: GAP },
     { side: start, align: 'center', offset: GAP },
+    ...(panel
+      ? [
+          {
+            side: start,
+            align: 'center' as const,
+            offset: (rtl ? panel.right - row.right : row.left - panel.left) + GAP,
+          },
+          {
+            side: end,
+            align: 'center' as const,
+            offset: (rtl ? row.left - panel.left : panel.right - row.right) + GAP,
+          },
+        ]
+      : []),
   ]
   let best: { place: TooltipPlace; covered: number } | null = null
   const past = panel && !phone ? [...pastMenu].sort((one, other) => one.offset - other.offset) : pastMenu

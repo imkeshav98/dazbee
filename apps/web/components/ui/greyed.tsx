@@ -105,13 +105,15 @@ export function useWhyTip<T extends HTMLElement>(why: string | null) {
 }
 
 /**
- * Where a row's tooltip goes: beside it when there is room, otherwise past the top or bottom of its menu (in the edit panel, of its grid), or on a
+ * Where a row's tooltip goes: beside it when there is room, in the edit panel beside the panel level
+ * with it, otherwise past the top or bottom of its menu (in the edit panel, of its grid), or on a
  * phone just above its menu or grid, clear of every row that shows in the open menus, measured as it
  * is about to show.
  */
 function placeFor(row: HTMLElement, label: string, screen: TipScreen): TooltipPlace {
   // In the edit panel a control sits in a grid of its own (the numbers, Order, Line up): the
-  // tooltip goes past that grid, near the control, rather than past the whole panel.
+  // tooltip goes beside the panel level with the control, or past that grid near the control, rather
+  // than past the whole panel.
   const panel = row.closest('#edit-panel')
   const own = (panel ? row.parentElement : row.closest('[role="dialog"], [role="menu"]')) ?? row
   const rows = [...document.querySelectorAll(`${HOLDERS} :is(button, [data-scrub])`)].filter((one) =>

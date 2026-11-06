@@ -145,9 +145,35 @@ describe('tooltipPlace', () => {
     ]
     const row = rows[3] as Box
     const room = { width: 1280, height: 760 }
-    const place = tooltipPlace({ row, size: TIP, own, rows, room, screen: WIDE, panel: own })
+    // A panel as wide as the window, so beside it has no room.
+    const panel = { left: 10, top: 150, right: 1270, bottom: 350 }
+    const place = tooltipPlace({ row, size: TIP, own, rows, room, screen: WIDE, panel })
     expect(place).toMatchObject({ side: 'bottom', offset: 8 })
     expect(tooltipPlace({ row, size: TIP, own, rows, room, screen: WIDE })).toMatchObject({ side: 'top' })
+  })
+
+  it('in the edit panel, puts a control’s reason beside the panel level with the control when its grid has rows on every side', () => {
+    // Three grids of two controls stacked in a panel at the window's end; the row is the middle grid's last.
+    const controls = (left: number, right: number) =>
+      [200, 240, 280, 320].flatMap((top) => [
+        { left, top, right: left + 120, bottom: top + 30 },
+        { left: left + 128, top, right, bottom: top + 30 },
+      ])
+    for (const rtl of [false, true]) {
+      const panel = rtl
+        ? { left: 8, top: 100, right: 280, bottom: 700 }
+        : { left: 1000, top: 100, right: 1272, bottom: 700 }
+      const rows = controls(panel.left + 12, panel.right - 12)
+      const row = (rtl ? rows[4] : rows[5]) as Box
+      const own = { left: panel.left + 12, top: 240, right: panel.right - 12, bottom: 310 }
+      const screen = { rtl, phone: false }
+      const place = tooltipPlace({ row, size: TIP, own, rows, room: ROOM, screen, panel })
+      expect(place.side).toBe(rtl ? 'right' : 'left')
+      const box = tooltipBox(place, row, TIP, ROOM, rtl)
+      expect(covered(place, row, [...rows, panel], ROOM, rtl)).toEqual([])
+      expect(box && (box.top + box.bottom) / 2).toBe((row.top + row.bottom) / 2)
+      expect(box && (rtl ? box.left - panel.right : panel.left - box.right)).toBe(8)
+    }
   })
 
   it('takes the place that covers the fewest rows when every place covers some', () => {
