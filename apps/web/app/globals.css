@@ -255,7 +255,7 @@ body {
 
 /*
  * A menu (`data-menu`, a menu's content) showing a row's short menu in its own place, as a phone
- * does (SubMenu): only that short menu shows, under its back row, and the rest of the menu hides,
+ * does (MenuSub in components/ui/menu.tsx): only that short menu shows, under its back row, and the rest of the menu hides,
  * however deep in the menu the short menu sits.
  */
 [data-menu]:has([data-menu-in-place]) :not([data-menu-in-place], [data-menu-in-place] *, :has([data-menu-in-place])) {
