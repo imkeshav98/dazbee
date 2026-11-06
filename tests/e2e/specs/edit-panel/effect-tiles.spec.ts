@@ -5,9 +5,9 @@
 import type { DesignInput } from '@dazbee/schema'
 
 import { photo, upload } from '../../support/assets.ts'
-import { writeOutput } from '../../support/editor.ts'
+import { editorPath, writeOutput } from '../../support/editor.ts'
 import { choose } from '../../support/fields.ts'
-import { frameDesign, type Seeded } from '../../support/seed.ts'
+import { frameDesign, seed, type Seeded } from '../../support/seed.ts'
 import { openStage, perform, selectLayers } from '../../support/stage.ts'
 import { expect, type Page, test } from '../../support/test.ts'
 import { barMenu } from '../../support/top-bar.ts'
@@ -198,4 +198,24 @@ test('a tile adds its effect and takes it off, None takes them all off, and Add 
     )
     .toBeUndefined()
   expect(errors).toEqual([])
+})
+
+test('on a phone Add effect and its choices are 44 px targets, as every field there', async ({ browser }) => {
+  const asset = await upload(photo)
+  const designId = await seed(design(asset.id))
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true })
+  const page = await context.newPage()
+  await page.goto(editorPath(designId))
+  await expect(page.getByTestId('status')).toHaveAttribute('data-ready', '', { timeout: 60_000 })
+  await selectLayers(page, ['star'], { bar: true })
+  const panel = await barMenu(page, 'effects')
+  const add = panel.getByRole('combobox', { name: 'Add effect' })
+  await add.scrollIntoViewIfNeeded()
+  expect((await add.boundingBox())?.height).toBe(44)
+  await add.tap()
+  const choices = page.getByRole('listbox').getByRole('option')
+  await expect(choices.first()).toBeVisible()
+  for (const height of await choices.evaluateAll((all) => all.map((one) => one.getBoundingClientRect().height)))
+    expect(height).toBeGreaterThanOrEqual(44)
+  await context.close()
 })

@@ -193,7 +193,7 @@ export function ExportForm({
             options={pages.map(([pageId, p]) => ({ value: pageId, label: p.name }))}
             onChange={choosePage}
             testId="export-page"
-            className={cn('h-8 bg-raised px-2 text-[13px]', TOUCH_FIELD)}
+            className="h-8 bg-raised px-2 text-[13px]"
           />
         </div>
       )}

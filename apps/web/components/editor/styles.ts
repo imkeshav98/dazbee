@@ -105,7 +105,7 @@ export const LAYER_PICTURE = 'border border-line bg-surface'
 export const FIELD_LABEL = 'text-xs font-semibold text-muted'
 
 /** A dropdown field's box, as tall as a knob. */
-export const SELECT = `h-8 ${TOUCH_FIELD} w-full bg-surface px-1.5 text-[12px]`
+export const SELECT = 'h-8 w-full bg-surface px-1.5 text-[12px]'
 /**
  * A number you drag sideways, as in the mock: its label at the start, its value in mono at the end,
  * and a soft fill behind them showing where the value sits in its range: from `--fill-from`, `--fill` wide,
