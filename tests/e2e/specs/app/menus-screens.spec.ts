@@ -21,7 +21,7 @@ const openMenu = (page: Page) => page.locator('[data-radix-popper-content-wrappe
 
 /** Waits for the open menus to settle, moves the pointer off them unless told not to, and takes the picture. */
 async function picture(page: Page, name: string, { keepPointer = false } = {}) {
-  await entered(page.locator('body'))
+  await entered(page.locator('[data-radix-popper-content-wrapper]').last())
   if (!keepPointer) await page.mouse.move(2, 2)
   await drawn(page)
   await shoot(page, name)
@@ -103,6 +103,8 @@ for (const [width, height] of SCREEN_SIZES)
       await expect(page.getByTestId('bar-frame-more-menu')).toBeVisible()
       await picture(page, name('frame'))
       await closeAll(page)
+      // Let the frame go, so the phone shows its zoom pill again.
+      await page.evaluate(() => window.dazbee?.pickFrame(null))
       await selectLayers(page, [])
 
       // Share.
