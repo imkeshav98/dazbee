@@ -131,13 +131,16 @@ async function openCase(page: Page, one: (typeof CASES)[number]) {
 
 for (const [width, height] of SCREEN_SIZES) {
   for (const one of CASES) {
-    test(`at ${width}×${height} with a layer ${one.name}, the small menu keeps off the frames’ labels and the size stays on the screen`, async ({
+    test(`at ${width}×${height} with a layer ${one.name}, the small menu keeps off the frames’ labels, the size stays on the screen, and no tooltip shows`, async ({
       browser,
     }) => {
       const { page, errors } = await openSized(browser, { width, height }, { input: withCorner() })
       await openCase(page, one)
       await expect(page.getByTestId('small-menu')).toBeVisible()
       await expect.poll(() => problems(page)).toEqual([])
+      // With nothing hovered no tooltip shows, the top bar's Position's included.
+      await nextFrame(page)
+      await expect(page.getByRole('tooltip')).toHaveCount(0)
       expect(errors).toEqual([])
     })
   }
