@@ -6,20 +6,11 @@ import type { Point, Rect, RunStyle } from '@dazbee/schema'
 
 import { type Camera, toScreen, toWorld } from '../../canvas/camera.ts'
 import { type Frame, frameAt, intersects } from '../../canvas/frames.ts'
-import { px } from '../../canvas/rulers.ts'
 import type { FrameScenes } from '../../canvas/scenes.ts'
 import { inFlow } from '../../layers/auto-layout.ts'
 import type { EditorBoxes, SelectionBox } from '../../layers/boxes.ts'
 import { resizedBoxes, scalingTexts, switchSizing } from '../../layers/resize.ts'
-import {
-  type Gap,
-  type Guide,
-  SNAP_DISTANCE,
-  snapMove,
-  snapResize,
-  snapTargets,
-  type Targets,
-} from '../../layers/snap.ts'
+import { SNAP_DISTANCE, snapMove, snapResize, snapTargets, type Targets } from '../../layers/snap.ts'
 import {
   angleOf,
   boundsOf,
@@ -43,6 +34,7 @@ import { runQuietly } from '../../run-quietly.ts'
 import type { EditorSelection, Selection } from '../../selection.ts'
 import type { EditorTyping } from '../../text/typing.ts'
 import { HANDLE_REACH, HANDLE_SIZE } from '../press.ts'
+import { dragParts, type Snapped } from './drag-parts.ts'
 
 /** The selected layers of one frame a move carries, inside their containers there, and their boxes as the drag began. */
 export interface MovePart {
@@ -176,7 +168,7 @@ export function editorTransformDrag({
   placeBox,
 }: TransformDragDeps): EditorTransformDrag {
   /** What the drag in progress snapped to, shown as guides and equal gaps (#42). */
-  let snapped: { frame: Frame; guides: Guide[]; gaps: Gap[] } | null = null
+  let snapped: Snapped | null = null
   /** Snapping's work since the editor opened: drags that gathered targets, moves that snapped, the last drag's targets. */
   const snapWork = { gathered: 0, moves: 0, targets: 0 }
   /** What each gesture has written so far, by its start boxes: `<id>|<property>`. */
@@ -221,57 +213,8 @@ export function editorTransformDrag({
     return corner === -1 ? null : { kind: 'rotate', corner }
   }
   /** The marquee being dragged, then the snap guides and equal gaps of the drag in progress. */
-  function dragParts(marquee: MarqueeDrag | null) {
-    const parts: HTMLElement[] = []
-    if (marquee) {
-      const el = document.createElement('div')
-      el.className = 'marquee'
-      const from = toScreen(camera(), marquee.from)
-      const to = toScreen(camera(), marquee.to)
-      Object.assign(el.style, {
-        left: px(Math.min(from.x, to.x)),
-        top: px(Math.min(from.y, to.y)),
-        width: px(Math.abs(to.x - from.x)),
-        height: px(Math.abs(to.y - from.y)),
-      })
-      parts.push(el)
-    }
-    if (snapped) parts.push(...snapParts(snapped))
-    return parts
-  }
-  /** Snap guides as lines across the frame, and equal gaps as marked spans with their size. */
-  function snapParts({ frame, guides, gaps }: NonNullable<typeof snapped>) {
-    const parts: HTMLElement[] = []
-    for (const g of guides) {
-      const line = document.createElement('div')
-      line.className = 'guide'
-      line.dataset.axis = g.axis
-      placeBox(
-        line,
-        frame,
-        g.axis === 'x'
-          ? { x: g.at, y: g.from, width: 0, height: g.to - g.from }
-          : { x: g.from, y: g.at, width: g.to - g.from, height: 0 },
-      )
-      parts.push(line)
-    }
-    for (const g of gaps) {
-      const span = document.createElement('div')
-      span.className = 'gap'
-      span.dataset.axis = g.axis
-      placeBox(
-        span,
-        frame,
-        g.axis === 'x'
-          ? { x: g.from, y: g.at, width: g.to - g.from, height: 0 }
-          : { x: g.at, y: g.from, width: 0, height: g.to - g.from },
-      )
-      const size = document.createElement('span')
-      size.textContent = String(round(g.to - g.from, 0))
-      span.append(size)
-      parts.push(span)
-    }
-    return parts
+  function shownParts(marquee: MarqueeDrag | null) {
+    return dragParts(marquee, snapped, camera(), placeBox)
   }
 
   /** Lets the guides of the drag that snapped go, as every press ends. */
@@ -561,7 +504,7 @@ export function editorTransformDrag({
   return {
     snapWork: snapWorkSoFar,
     handleUnder,
-    parts: dragParts,
+    parts: shownParts,
     pressHandle,
     pressMove,
     drag,
