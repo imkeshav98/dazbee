@@ -261,7 +261,7 @@ test('the small menu locks, duplicates, deletes and hides; the full menu copies 
   await expect(
     page
       .getByTestId('more-paste-menu')
-      .getByRole('button', { name: /^Paste/ })
+      .getByRole('menuitem', { name: /^Paste/ })
       .first(),
   ).toHaveAttribute('aria-disabled', 'true')
   await page.keyboard.press('Escape')
@@ -282,8 +282,8 @@ test('with a layer under a mask selected, the full and right-click menus release
     page.evaluate(() => (window.dazbee?.design().nodes.cutter?.props as { mask?: string }).mask ?? null)
   await selectLayers(page, ['photoB'])
   const full = await moreMenu(page)
-  await expect(full.getByRole('button', { name: /^Use as mask/ })).toHaveCount(0)
-  await expect(full.getByRole('button', { name: /^Release mask/ })).toBeVisible()
+  await expect(full.getByRole('menuitemcheckbox', { name: /^Use as mask/ })).toHaveCount(0)
+  await expect(full.getByRole('menuitem', { name: /^Release mask/ })).toBeVisible()
   writeOutput('full-menu-release-mask.png', await page.screenshot({ animations: 'disabled' }))
   await moreAction(page, 'Release mask')
   await expect.poll(mask).toBeNull()
@@ -317,9 +317,9 @@ test("a right-click on a frame's empty canvas, or outside every frame, offers to
   const empty = await screenPoint(page, 720, 680)
   await page.mouse.click(empty.x, empty.y, { button: 'right' })
   const menu = page.getByTestId('stage-menu')
-  await expect(menu.getByRole('button')).toHaveText(['Show hidden layers'])
+  await expect(menu.getByRole('menuitem')).toHaveText(['Show hidden layers'])
   writeOutput('stage-menu-show-hidden.png', await page.screenshot({ animations: 'disabled' }))
-  await menu.getByRole('button', { name: 'Show hidden layers' }).click()
+  await menu.getByRole('menuitem', { name: 'Show hidden layers' }).click()
   await expect(menu).toBeHidden()
   await expect.poll(() => visible()).not.toBe(false)
   // With nothing hidden, no menu opens.
@@ -332,8 +332,8 @@ test("a right-click on a frame's empty canvas, or outside every frame, offers to
   const gap = await screenPoint(page, 1110, 300)
   expect(await page.evaluate((at) => window.dazbee?.spotAt(at) ?? null, gap)).toBeNull()
   await page.mouse.click(gap.x, gap.y, { button: 'right' })
-  await expect(menu.getByRole('button')).toHaveText(['Show hidden layers'])
-  await menu.getByRole('button', { name: 'Show hidden layers' }).click()
+  await expect(menu.getByRole('menuitem')).toHaveText(['Show hidden layers'])
+  await menu.getByRole('menuitem', { name: 'Show hidden layers' }).click()
   await expect.poll(() => visible()).not.toBe(false)
   expect(await visible('st-hidden')).toBe(false)
   expect(errors).toEqual([])
@@ -391,7 +391,7 @@ test('beside an open Layers flyout the top bar centres in the room left, and a r
   const at = await screenPoint(page, 160, 280)
   await page.mouse.click(at.x, at.y, { button: 'right' })
   const menu = page.getByTestId('stage-menu')
-  await menu.getByRole('button', { name: /^Unlock in all frames/ }).click()
+  await menu.getByRole('menuitem', { name: /^Unlock in all frames/ }).click()
   await expect(menu).toBeHidden()
   await expect
     .poll(() => page.evaluate(() => Object.values(window.dazbee?.design().nodes.box?.lock ?? {}).some(Boolean)))

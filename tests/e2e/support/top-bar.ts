@@ -147,8 +147,8 @@ export async function moreAction(page: Page, name: string, menu?: Locator) {
   const root = menu ?? (await moreMenu(page))
   const named = (within: Locator) =>
     within
-      .getByRole('button', { name: new RegExp(`^${name}`) })
-      .and(within.locator('button:not([aria-haspopup]):not([aria-disabled="true"])'))
+      .locator('[role^="menuitem"]:not([aria-haspopup]):not([aria-disabled="true"])')
+      .filter({ hasText: new RegExp(`^${name}`) })
       .first()
   const run = async (action: Locator) => {
     await action.click()

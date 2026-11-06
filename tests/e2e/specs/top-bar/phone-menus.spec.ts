@@ -147,7 +147,7 @@ for (const [locale, toward, back] of [
     await expect(sub).toBeVisible()
     await expect(menu.getByTestId('more-copy-back')).toBeFocused()
     await page.keyboard.press('ArrowDown')
-    await expect(sub.getByRole('button').first()).toBeFocused()
+    await expect(sub.getByRole('menuitem').first()).toBeFocused()
     await page.keyboard.press(back)
     await expect(sub).toHaveCount(0)
     await expect(menu.getByTestId('more-copy')).toBeFocused()

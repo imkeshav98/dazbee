@@ -83,8 +83,9 @@ export function EditorStage({
   }, [t])
   const locale = useLocale()
   const [notice, setNotice] = useState<{ text: string; at: number; lasting?: boolean } | null>(null)
-  // A right-click on a layer: where, for the menu of its actions, and a count so each right-click opens its own.
-  const [menuAt, setMenuAt] = useState<{ x: number; y: number; n: number; hidden: HiddenLayers | null } | null>(null)
+  // The right-click menu open on the stage, with the hidden layers it offers to show on empty canvas.
+  const [menuAt, setMenuAt] = useState<{ hidden: HiddenLayers | null } | null>(null)
+  const closeMenu = useCallback(() => setMenuAt(null), [])
   const dismissNotice = useCallback(() => setNotice(null), [])
   // Where the open sheet starts on a phone: the toasts sit above it.
   const { sheetTop } = useEditState()
@@ -298,21 +299,6 @@ export function EditorStage({
       <div
         dir="ltr"
         className="absolute inset-0"
-        onContextMenu={(e) => {
-          if (!editor || e.target !== canvas.current) return
-          e.preventDefault()
-          const client = { x: e.clientX, y: e.clientY }
-          const ids = editor.selectAt(client)
-          // On empty canvas, in a frame or outside every one, the menu only offers to show the hidden
-          // layers of the frame there or nearest, when it has some.
-          const hidden = ids.length > 0 ? null : hiddenAt(editor, client)
-          const box = e.currentTarget.getBoundingClientRect()
-          setMenuAt((now) =>
-            ids.length > 0 || hidden
-              ? { x: client.x - box.left, y: client.y - box.top, n: (now?.n ?? 0) + 1, hidden }
-              : null,
-          )
-        }}
         onDragOver={(e) => {
           if (!editor) return
           if (!e.dataTransfer.types.includes(ASSET_DRAG_TYPE) && carriesFiles(e.dataTransfer)) {
@@ -346,18 +332,29 @@ export function EditorStage({
           editor.imageTarget(null)
         }}
       >
-        <canvas ref={canvas} className="block size-full touch-none" data-testid="stage" />
+        <StageMenu editor={editor} menu={menuAt} onClose={closeMenu}>
+          <canvas
+            ref={canvas}
+            className="block size-full touch-none"
+            data-testid="stage"
+            onContextMenu={(e) => {
+              // The menu opens only for what the right-click picks, or on empty canvas, in a frame or
+              // outside every one, to show the hidden layers of the frame there or nearest, when it has
+              // some; otherwise neither it nor the browser's menu opens.
+              const client = { x: e.clientX, y: e.clientY }
+              const ids = editor?.selectAt(client) ?? []
+              const hidden = editor && ids.length === 0 ? hiddenAt(editor, client) : null
+              if (ids.length === 0 && !hidden) {
+                e.preventDefault()
+                setMenuAt(null)
+                return
+              }
+              setMenuAt({ hidden })
+            }}
+          />
+        </StageMenu>
         <div ref={overlay} className="stage-overlay pointer-events-none absolute inset-0 overflow-hidden" aria-hidden />
         {editor && <FrameRename editor={editor} />}
-        {editor && menuAt && (
-          <StageMenu
-            key={menuAt.n}
-            editor={editor}
-            at={menuAt}
-            hidden={menuAt.hidden}
-            onClose={() => setMenuAt(null)}
-          />
-        )}
       </div>
       {/* The top bar, the small menu and the edit panel follow the page's direction, so they mirror in Arabic. */}
       {editor && <TopBar editor={editor} brandId={brandId} />}

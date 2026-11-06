@@ -2,6 +2,7 @@
 // open, its layers as a tab holds them, and the full menu's rows, greyed rows and closing.
 import { photo, upload } from './assets.ts'
 import { linkedMenuDesign } from './linked-menu-design.ts'
+import { namedRow } from './menu-rows.ts'
 import { fitSettled, openStage, perform } from './stage.ts'
 import { expect, type Locator, type Page } from './test.ts'
 
@@ -55,7 +56,7 @@ export const rowsOf = (menu: Locator) =>
  * tooltip as the pointer rests on it.
  */
 export async function expectGreyed(page: Page, menu: Locator, name: string, why: string) {
-  const row = menu.getByRole('button', { name: new RegExp(`^${name}`) }).first()
+  const row = namedRow(menu, name)
   await expect(row).toHaveAttribute('aria-disabled', 'true')
   await expect(row).toHaveAttribute('aria-description', why)
   // Over the row in a few moves, as a hand does: the first after leaving another tooltip's row only ends that one.

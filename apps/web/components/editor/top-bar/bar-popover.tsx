@@ -2,20 +2,16 @@
 
 // One button of the bar by the selection and the popover it opens under it, or, for a pop-up the
 // edit store names a sheet, at the bottom of a phone's screen. The bar keeps which one is open, so
-// only one is open at a time. Also what the editor's menus share: the sheet a phone shows a menu as,
-// the focus as a popover opens and closes, the arrows along a toolbar and through a menu's rows, Tab
-// once into a toolbar, Esc going back from a row's short menu shown in its menu's place, and a menu
-// that shows it scrolls.
+// only one is open at a time. Also what the editor's pop-ups share: the sheet a phone shows a pop-up
+// as, the focus as a popover opens and closes, the arrows along a toolbar, Tab once into a toolbar,
+// and how far under the bar a pop-up hangs.
 import { CaretDownIcon } from '@phosphor-icons/react'
 import * as Popover from '@radix-ui/react-popover'
 import {
-  createContext,
   type FocusEvent,
   type KeyboardEvent,
   type ReactNode,
   type RefObject,
-  useCallback,
-  useContext,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -53,21 +49,7 @@ export const SHEET_LOOK =
 /** The room between the bar's last row that shows and a popover under it, in pixels. */
 const GAP = 8
 
-/** Where each key moves the focus in a menu, from the row at `i` of rows up to `last`. */
-const STEPS = {
-  ArrowDown: (i: number, last: number) => (i >= last ? 0 : i + 1),
-  ArrowUp: (i: number, last: number) => (i <= 0 ? last : i - 1),
-  Home: () => 0,
-  End: (_: number, last: number) => last,
-}
-
 const nowhere = () => document.activeElement === null || document.activeElement === document.body
-
-/**
- * The way back from the row's short menu that shows in its menu's place, kept for the menu that
- * holds it: null while none shows.
- */
-const BackInPlace = createContext<RefObject<(() => void) | null> | null>(null)
 
 /**
  * Where a sheet hangs from on a phone: a line along the screen's bottom edge, SHEET_EDGE in from
@@ -120,26 +102,6 @@ export function arrowAlong(event: KeyboardEvent<HTMLElement>) {
 }
 
 /**
- * Moves the focus between a menu's rows with the up and down arrows, wrapping round at the ends,
- * and Home and End: its buttons that show, greyed ones too. A field keeps its own keys, its arrows
- * stepping its value; Tab reaches it. Goes on the content of every menu of the editor (the full
- * menu, the right-click menu, Arrange ⋯, a picked frame's ⋯ and each menu beside one of their
- * rows); a menu opened beside a row, drawn elsewhere in the page, moves through its own rows.
- */
-export function arrowThrough(event: KeyboardEvent<HTMLElement>) {
-  if (event.defaultPrevented || !(event.key in STEPS)) return
-  const at = document.activeElement
-  if (!(at instanceof HTMLButtonElement) || !event.currentTarget.contains(at)) return
-  const rows = [...event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled)')].filter((row) =>
-    row.checkVisibility({ visibilityProperty: true }),
-  )
-  const i = rows.indexOf(at)
-  if (i < 0) return
-  event.preventDefault()
-  rows[STEPS[event.key as keyof typeof STEPS](i, rows.length - 1)]?.focus()
-}
-
-/**
  * How a popover gives the focus back to its button as it closes. It goes back as the popover leaves
  * the page, so a key or click straight after acts from the button and not from the page; a field
  * that had the focus is gone by then, so it never loses the focus and saves what was typed. Radix
@@ -174,35 +136,17 @@ export function useMenuFocus() {
 }
 
 /**
- * Lets Esc go back from a row's short menu shown in the menu's place (SubMenu, on a phone) before it
- * closes the menu, through Radix's own layers: `onEscapeKeyDown` goes on the menu's content and
- * `rows` round its rows. A greyed row's tooltip that shows is a layer over the menu, so Radix gives
- * it Esc first and it closes. The Esc that goes back goes no further: going back takes the focused
- * row out of the page, and the stage would take an Esc from outside a menu as its own and let the
- * selection go, closing the menu with it.
+ * How far under its button (`button`) a pop-up of the bar hangs while it shows, to clear the whole
+ * bar (`offsetUnder`): measured as it opens, and again when the bar's bottom moves, as when its
+ * second row opens.
  */
-export function useEscapeBack() {
-  const back = useRef<(() => void) | null>(null)
-  const onEscapeKeyDown = useCallback((event: globalThis.KeyboardEvent) => {
-    if (!back.current) return
-    event.preventDefault()
-    event.stopPropagation()
-    back.current()
-  }, [])
-  const rows = useCallback((children: ReactNode) => <BackInPlace value={back}>{children}</BackInPlace>, [])
-  return { onEscapeKeyDown, rows }
-}
-
-/** Keeps `goBack` as the way back Esc takes in the menu this short menu shows in the place of, while it shows. */
-export function useBackInPlace(goBack: () => void) {
-  const back = useContext(BackInPlace)
-  useEffect(() => {
-    if (!back) return
-    back.current = goBack
-    return () => {
-      if (back.current === goBack) back.current = null
-    }
-  }, [back, goBack])
+export function useUnderBar(button: RefObject<HTMLElement | null>, shown: boolean) {
+  const { barBottom } = useEditState()
+  const [below, setBelow] = useState(GAP)
+  useLayoutEffect(() => {
+    if (shown) setBelow(offsetUnder(button.current))
+  }, [shown, barBottom, button])
+  return below
 }
 
 /**
@@ -236,7 +180,6 @@ export function BarPopover({
   children,
   testId,
   className,
-  menu = false,
   align = 'center',
   buttonRef,
   opens,
@@ -253,12 +196,7 @@ export function BarPopover({
   children: ReactNode
   testId: string
   className?: string
-  /**
-   * Whether it is a ⋯ that opens a menu of actions: its button shows no ▾, and the arrows, Home and
-   * End move between the menu's rows.
-   */
-  menu?: boolean
-  /** Where the popover lines up under its button: its middle, or its end, as a menu of actions does. */
+  /** Where the popover lines up under its button: its middle, or its end. */
   align?: 'center' | 'end'
   /** Given the button, for a control that gives the focus back to it later. */
   buttonRef?: RefObject<HTMLButtonElement | null>
@@ -268,7 +206,6 @@ export function BarPopover({
   on?: boolean
 }) {
   const focus = useMenuFocus()
-  const escape = useEscapeBack()
   const shown = open === id
   const phone = usePhone()
   // On a phone a button with an icon shows it alone, named by its label, so the bar keeps to two rows.
@@ -276,12 +213,7 @@ export function BarPopover({
   // A sheet on a phone, as `isSheet` names it: the anchor is the screen's bottom edge, and Radix's
   // trigger width is the anchor's.
   const asSheet = phone && isSheet(id)
-  // Measured as it opens, and again when the bar's bottom moves, as when its second row opens.
-  const { barBottom } = useEditState()
-  const [below, setBelow] = useState(GAP)
-  useLayoutEffect(() => {
-    if (shown) setBelow(offsetUnder(focus.button.current))
-  }, [shown, barBottom, focus.button])
+  const below = useUnderBar(focus.button, shown)
   return (
     <Popover.Root open={shown} onOpenChange={(to) => onOpen(to ? id : null)}>
       <Popover.Trigger asChild>
@@ -301,7 +233,7 @@ export function BarPopover({
         >
           {icon}
           {face ?? (bare ? null : label)}
-          {!menu && <CaretDownIcon size={10} weight="bold" aria-hidden className="text-subtle" />}
+          <CaretDownIcon size={10} weight="bold" aria-hidden className="text-subtle" />
         </button>
       </Popover.Trigger>
       {asSheet && <SheetAnchor />}
@@ -310,18 +242,16 @@ export function BarPopover({
           {...(asSheet ? SHEET_PLACE : { side: 'bottom', align, sideOffset: below, collisionPadding: 12 })}
           {...focus.content}
           // A number field being typed in takes Esc first, throwing away what was typed; the next
-          // Esc goes back from a row's short menu shown in its place, then closes the popover.
-          onEscapeKeyDown={(event) =>
-            typingIn(document.activeElement) ? event.preventDefault() : escape.onEscapeKeyDown(event)
-          }
-          onKeyDown={menu ? arrowThrough : undefined}
+          // Esc closes the popover.
+          onEscapeKeyDown={(event) => {
+            if (typingIn(document.activeElement)) event.preventDefault()
+          }}
           aria-label={label}
           data-testid={`bar-${testId}-menu`}
-          data-menu={menu || undefined}
           className={cn(POPOVER, 'flex flex-col p-1.5', asSheet ? SHEET_LOOK : (className ?? 'min-w-56'))}
         >
           {focus.back}
-          {escape.rows(children)}
+          {children}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

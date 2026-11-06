@@ -292,11 +292,11 @@ test('Duplicate from ⋯ and Ctrl+D copy the picked frame beside the rightmost o
   const menu = await frameMenuItems(a)
   // As a page's ⋯ on the Pages card: a line before Delete, in the danger colour, and the menu
   // under the bar, lined up with the end of ⋯.
-  const remove = menu.getByRole('button', { name: /Delete/ })
+  const remove = menu.getByRole('menuitem', { name: /Delete/ })
   await expect(menu.getByRole('separator')).toHaveCount(1)
   expect(await remove.evaluate((el) => el.previousElementSibling?.getAttribute('role'))).toBe('separator')
   const ink = (el: Element) => getComputedStyle(el).color
-  expect(await remove.evaluate(ink)).not.toBe(await menu.getByRole('button', { name: 'Rename' }).evaluate(ink))
+  expect(await remove.evaluate(ink)).not.toBe(await menu.getByRole('menuitem', { name: 'Rename' }).evaluate(ink))
   const more = await a.getByTestId('bar-frame-more').boundingBox()
   const bar = await a.getByTestId('top-bar').boundingBox()
   const box = await menu.boundingBox()
@@ -304,7 +304,7 @@ test('Duplicate from ⋯ and Ctrl+D copy the picked frame beside the rightmost o
   expect(Math.abs(box.x + box.width - (more.x + more.width))).toBeLessThanOrEqual(1)
   expect(box.y).toBeGreaterThanOrEqual(bar.y + bar.height)
   writeOutput('frames-2-menu.png', await a.screenshot({ animations: 'disabled' }))
-  await menu.getByRole('button', { name: /Duplicate/ }).click()
+  await menu.getByRole('menuitem', { name: /Duplicate/ }).click()
   await expect(menu).toBeHidden()
   await expect.poll(() => picked(a)).not.toBe('sq')
   const copy = (await picked(a)) ?? ''
@@ -361,7 +361,7 @@ test('Delete from ⋯ and the Delete key take the picked frame and its layers aw
   const before = await read(a)
   await clickLabel(a, 'sq')
   const menu = await barMenu(a, 'frame-more')
-  await menu.getByRole('button', { name: /Delete/ }).click()
+  await menu.getByRole('menuitem', { name: /Delete/ }).click()
   await expect.poll(() => picked(a)).toBeNull()
   await expect(a.getByTestId('top-bar')).toHaveCount(0)
   // The toast says so with its undo, as deleting a page does.

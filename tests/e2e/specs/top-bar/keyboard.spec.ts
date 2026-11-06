@@ -500,7 +500,7 @@ test.describe('the focus as a menu of the bar closes', () => {
     const { page, errors } = await openStage(browser, oneLayer())
     await selectLayers(page, ['a'])
     const copy = await moreSubmenu(page, 'copy')
-    await copy.getByRole('button').first().focus()
+    await copy.getByRole('menuitem').first().focus()
 
     await keyThen(page, { key: 'Escape', closed: 'more-copy-menu', next: 'esc', then: '!bar-more-menu' })
     await timers(page)

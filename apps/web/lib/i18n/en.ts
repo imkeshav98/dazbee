@@ -272,8 +272,6 @@ export const en = {
       show: 'Show',
       topBar: 'Selected layers',
       smallMenu: 'Layer actions',
-      /** The back row of a menu shown in its menu's place on a phone, which names the row it opened from. */
-      backFrom: 'Back from {menu}',
       overflow: 'More controls',
       copy: 'Copy',
       paste: 'Paste',
@@ -415,6 +413,10 @@ export const en = {
       moveUp: 'Move up',
       moveDown: 'Move down',
       remove: 'Delete page',
+      /** Why a page card's ⋯ greys a row: the page is first or last already, or the design's only one. */
+      firstAlready: 'This page is first already',
+      lastAlready: 'This page is last already',
+      onlyPage: 'A design keeps at least one page',
       removed: '{name} deleted',
     },
     brandKit: {
@@ -904,6 +906,8 @@ export const en = {
     light: 'Light',
     dark: 'Dark',
   },
+  /** What every menu shows: the back row of a menu shown in its menu's place on a phone, naming the row it opened from. */
+  menu: { backFrom: 'Back from {menu}' },
   language: { label: 'Language' },
   account: { open: 'Your account', settings: 'Settings', workspace: 'Workspace' },
   signIn: {

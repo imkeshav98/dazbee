@@ -262,6 +262,16 @@ body {
   display: none;
 }
 
+/*
+ * A menu shown as a phone's sheet (`data-sheet`, a menu's content): along the screen's bottom edge,
+ * 7 px in from it and from each side, wherever Radix placed it by its button or right-click.
+ */
+[data-radix-popper-content-wrapper]:has(> [data-sheet]) {
+  transform: none !important;
+  inset: auto 7px 7px !important;
+  min-width: 0 !important;
+}
+
 /* The hover or pressed tint laid over a control's own fill, which stays: a card's row or boxed button
    under the pointer or pressed, and a glass button that is open. */
 @utility tint-hover {
@@ -310,7 +320,7 @@ body {
 .pop-in,
 .pop-in-start,
 .pop-in-end {
-  transform-origin: var(--radix-popover-content-transform-origin, top center);
+  transform-origin: var(--radix-popper-transform-origin, top center);
   animation: pop-in var(--chrome) var(--ease-pop) backwards;
 }
 .pop-in-start {

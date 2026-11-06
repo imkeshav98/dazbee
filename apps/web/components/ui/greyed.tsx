@@ -13,7 +13,8 @@ import { usePhone } from '@/lib/phone.ts'
 import { type Box, type TooltipPlace, tooltipPlace } from '@/lib/tooltip-place.ts'
 
 /** What a greyed control's tooltip keeps clear of: each open popover's content, the edit panel and the top bar. */
-const HOLDERS = ':is([data-radix-popper-content-wrapper] > [role="dialog"], #edit-panel, [role="toolbar"])'
+const HOLDERS =
+  ':is([data-radix-popper-content-wrapper] > :is([role="dialog"], [role="menu"]), #edit-panel, [role="toolbar"])'
 
 /** An element's box in the window. */
 const boxOf = (el: Element): Box => {
@@ -89,6 +90,8 @@ export function useWhyTip<T extends HTMLElement>(why: string | null) {
       onOpenChange: tell,
       plain: true,
     },
+    /** Shows why, as a menu's greyed row does when picked by a tap, a click or a key. */
+    show: () => tell(true),
     /** A tap or a click shows why, as the pointer resting on it does, and runs nothing. */
     tap: (event: MouseEvent) => {
       event.preventDefault()
@@ -110,7 +113,7 @@ function placeFor(row: HTMLElement, label: string, rtl: boolean, phone: boolean)
   // In the edit panel a control sits in a grid of its own (the numbers, Order, Line up): the
   // tooltip goes past that grid, near the control, rather than past the whole panel.
   const inPanel = row.closest('#edit-panel') !== null
-  const own = (inPanel ? row.parentElement : row.closest('[role="dialog"]')) ?? row
+  const own = (inPanel ? row.parentElement : row.closest('[role="dialog"], [role="menu"]')) ?? row
   const rows = [...document.querySelectorAll(`${HOLDERS} :is(button, [data-scrub])`)].filter((one) =>
     one.checkVisibility(),
   )

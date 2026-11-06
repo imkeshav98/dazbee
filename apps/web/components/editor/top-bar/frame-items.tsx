@@ -5,21 +5,21 @@
 // which opens the Add size card, Rename, Export, which opens the Share menu's Export with this frame
 // ticked alone, and Delete, the last after a line and in the danger colour, as a page's ⋯ on the
 // Pages card.
-import { CaretRightIcon, DotsThreeIcon } from '@phosphor-icons/react'
+import { DotsThreeIcon } from '@phosphor-icons/react'
 import { useRef } from 'react'
 
 import type { Editor } from '@dazbee/editor'
 import type { Design } from '@dazbee/schema'
 
 import { keyOf } from '@/components/editor/arrange-actions.ts'
-import { askExport, setOpen, setRenameOpener, useEditState } from '@/components/editor/edit-store.ts'
-import { MENU_DIVIDER, MENU_ITEM, MENU_KEY } from '@/components/ui/looks.ts'
-import { cn } from '@/lib/cn.ts'
+import { askExport, editState, setOpen, setRenameOpener, useEditState } from '@/components/editor/edit-store.ts'
+import { BAR_BUTTON } from '@/components/editor/styles.ts'
+import { Menu, MenuDivider, MenuItem } from '@/components/ui/menu.tsx'
 import { hexOf } from '@/lib/colour.ts'
 import { swatchOf } from '@/lib/editor/frame-swatch.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
 
-import { BarPopover } from './bar-popover.tsx'
+import { useUnderBar } from './bar-popover.tsx'
 import { type BarItem, Dot, PanelButton } from './top-bar-items.tsx'
 
 /** A swatch without its transparency, as a layer's Fill shows its colour on its button. */
@@ -32,11 +32,7 @@ export function useFrameItems(editor: Editor, frameId: string, design: Design): 
   const { open } = useEditState()
   // The ⋯ button, which the rename field and Export give the focus back to after Rename or Export here.
   const more = useRef<HTMLButtonElement | null>(null)
-  /** Closes the menu, then does what its row says. */
-  const act = (run: () => void) => () => {
-    setOpen(null)
-    run()
-  }
+  const below = useUnderBar(more, open === 'frame-more')
   return [
     {
       key: 'background',
@@ -47,67 +43,57 @@ export function useFrameItems(editor: Editor, frameId: string, design: Design): 
     {
       key: 'frame-more',
       node: (
-        <BarPopover
-          id="frame-more"
-          open={open}
-          onOpen={setOpen}
+        <Menu
+          trigger={
+            <button
+              ref={more}
+              type="button"
+              data-bar-item
+              aria-label={f.more}
+              title={f.more}
+              data-testid="bar-frame-more"
+              data-opens="addSize"
+              className={BAR_BUTTON}
+            >
+              <DotsThreeIcon size={18} weight="bold" aria-hidden />
+            </button>
+          }
+          open={open === 'frame-more'}
+          onOpenChange={(to) => {
+            // A row that opened something else, as Add size opens its card, keeps it open.
+            if (to) setOpen('frame-more')
+            else if (editState().open === 'frame-more') setOpen(null)
+          }}
           label={f.more}
-          face={<DotsThreeIcon size={18} weight="bold" aria-hidden />}
-          menu
-          align="end"
-          buttonRef={more}
-          testId="frame-more"
-          opens="addSize"
+          testId="bar-frame-more-menu"
+          place={{ side: 'bottom', align: 'end', sideOffset: below, collisionPadding: 12 }}
+          className="min-w-56"
         >
-          <button
-            type="button"
-            data-action="duplicate"
-            onClick={act(() => editor.perform('duplicate'))}
-            className={MENU_ITEM}
-          >
-            {t.editor.arrange.duplicate}
-            <kbd className={MENU_KEY}>{keyOf('duplicate')}</kbd>
-          </button>
-          <button
-            type="button"
-            data-action="add-size"
-            aria-haspopup="dialog"
-            onClick={() => setOpen('addSize')}
-            className={MENU_ITEM}
-          >
-            {f.addSize}
-            <CaretRightIcon size={12} weight="bold" aria-hidden className="text-subtle rtl:-scale-x-100" />
-          </button>
-          <button
-            type="button"
-            data-action="rename"
-            onClick={act(() => {
+          <MenuItem
+            action="duplicate"
+            label={t.editor.arrange.duplicate}
+            keys={keyOf('duplicate')}
+            onSelect={() => editor.perform('duplicate')}
+          />
+          <MenuItem action="add-size" label={f.addSize} caret onSelect={() => setOpen('addSize')} />
+          <MenuItem
+            action="rename"
+            label={f.rename}
+            onSelect={() => {
               setRenameOpener(more.current)
               editor.renameFrame(frameId)
-            })}
-            className={MENU_ITEM}
-          >
-            {f.rename}
-          </button>
-          <button
-            type="button"
-            data-action="export"
-            onClick={act(() => askExport([frameId], more.current))}
-            className={MENU_ITEM}
-          >
-            {f.export}
-          </button>
-          <div role="separator" className={MENU_DIVIDER} />
-          <button
-            type="button"
-            data-action="delete"
-            onClick={act(() => editor.perform('delete'))}
-            className={cn(MENU_ITEM, 'text-danger')}
-          >
-            {t.editor.bar.delete}
-            <kbd className={MENU_KEY}>{keyOf('delete')}</kbd>
-          </button>
-        </BarPopover>
+            }}
+          />
+          <MenuItem action="export" label={f.export} onSelect={() => askExport([frameId], more.current)} />
+          <MenuDivider />
+          <MenuItem
+            action="delete"
+            label={t.editor.bar.delete}
+            keys={keyOf('delete')}
+            danger
+            onSelect={() => editor.perform('delete')}
+          />
+        </Menu>
       ),
     },
   ]

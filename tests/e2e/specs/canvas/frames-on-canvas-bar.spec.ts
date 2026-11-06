@@ -135,7 +135,7 @@ test('Rename in ⋯ with the picked frame’s label off screen, zoomed in to 375
   await drawn(page)
   expect((await labelRow(page, 'sq')).y).toBeLessThan(stage.y)
   const menu = await barMenu(page, 'frame-more')
-  await menu.getByRole('button', { name: 'Rename' }).click()
+  await menu.getByRole('menuitem', { name: 'Rename' }).click()
   await expect(field).toBeFocused()
   await expect(field).toHaveValue('Square')
   expect(await zoomOf(page)).toBe(3.75)

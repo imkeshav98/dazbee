@@ -153,17 +153,17 @@ export const FRAME_MENU = [
 ] as const
 /**
  * Checks the picked frame's open ⋯ lists its items in order: Duplicate, Add size, Rename, Export, Delete. Given `to`,
- * the focus is on the first and Tab moves it down the list item by item, up to `to`. Gives the menu.
+ * the focus is on the first and the down arrow moves it down the list item by item, up to `to`. Gives the menu.
  */
 export async function frameMenuItems(page: Page, to?: (typeof FRAME_MENU)[number]['name']) {
   const menu = page.getByTestId('bar-frame-more-menu')
-  const items = menu.getByRole('button')
+  const items = menu.getByRole('menuitem')
   await expect(items).toHaveText(FRAME_MENU.map((item) => item.reads))
   for (const [i, item] of FRAME_MENU.entries()) {
     if (to === undefined) break
     await expect(items.nth(i)).toBeFocused()
     if (item.name === to) break
-    await page.keyboard.press('Tab')
+    await page.keyboard.press('ArrowDown')
   }
   return menu
 }
