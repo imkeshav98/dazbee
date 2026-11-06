@@ -12,6 +12,7 @@ import { AssetLink, type DesignInput } from '@dazbee/schema'
 
 import { api, photo, upload } from '../../support/assets.ts'
 import { designOf, exportHashOf, screenPoint, writeOutput } from '../../support/editor.ts'
+import { enter } from '../../support/fields.ts'
 import { openSized } from '../../support/frames-on-canvas.ts'
 import { frameDesign, newBrand, putKit } from '../../support/seed.ts'
 import { click, openStage, press, read } from '../../support/stage.ts'
@@ -185,7 +186,7 @@ test('a gradient over a photo: added on top, a stop edited, the two reordered, o
   expect(errors).toEqual([])
 })
 
-test('every fill row’s opacity reads its percent after its digits, the fill’s line 3 px clear of the % at 100%', async ({
+test('every fill row’s opacity reads its percent after its digits, the fill’s line never across its digits or %', async ({
   browser,
 }) => {
   const brandId = await newBrand('e2e fill opacity')
@@ -197,7 +198,13 @@ test('every fill row’s opacity reads its percent after its digits, the fill’
   await picker.getByRole('radio', { name: 'Line gradient' }).click()
   const opacities = panel.getByTestId('fill-list').locator('[data-scrub]')
   await expect(opacities).toHaveCount(2)
-  for (const knob of await opacities.all()) {
+  for (const [at, knob] of [...(await opacities.all()), ...(await opacities.all())].entries()) {
+    // Each at 100%, then each typed down to 75%, where a line at the fill's end would cross the digits.
+    const value = at < 2 ? '100' : '75'
+    if (value === '75') {
+      await enter(knob.getByRole('spinbutton'), '75')
+      await expect(knob.getByRole('spinbutton')).toHaveValue('75')
+    }
     const read = await knob.evaluate((el) => {
       const input = el.querySelector('input') as HTMLInputElement
       const unit = [...el.querySelectorAll('span')].find((one) => one.textContent === '%')
@@ -212,10 +219,10 @@ test('every fill row’s opacity reads its percent after its digits, the fill’
       return {
         value: input.value,
         after: !!sign && sign.left >= digits.right - 3,
-        clear: !el.hasAttribute('data-ranged') || line - (sign?.right ?? 0) >= 3,
+        clear: !el.hasAttribute('data-ranged') || line - (sign?.right ?? 0) >= 3 || line < digits.left - 3,
       }
     })
-    expect(read).toEqual({ value: '100', after: true, clear: true })
+    expect(read).toEqual({ value, after: true, clear: true })
   }
   expect(errors).toEqual([])
 })

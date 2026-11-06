@@ -82,6 +82,7 @@ export function NumberField({
   min: least,
   max: most,
   fillRange,
+  line = true,
   scale = 1,
   unit = '',
   placeholder,
@@ -101,6 +102,8 @@ export function NumberField({
   max?: number | undefined
   /** The range the fill shows the value in, where it differs from `min` and `max`. */
   fillRange?: readonly [number, number]
+  /** Whether a line marks the value at the fill's end; a field too narrow for it beside its digits has none. */
+  line?: boolean
   /** Shown as the value times this, such as 100 for a percentage. */
   scale?: number
   /** Shown after the value: %, ° or px. */
@@ -173,7 +176,7 @@ export function NumberField({
     <div
       data-scrub={name}
       title={format(t.editor.props.scrub, { name })}
-      data-ranged={fill.at === null ? undefined : ''}
+      data-ranged={fill.at === null || !line ? undefined : ''}
       style={
         { '--fill-from': `${fill.from}%`, '--fill': `${fill.width}%`, '--fill-at': `${fill.at ?? 0}%` } as CSSProperties
       }
@@ -301,7 +304,8 @@ export function ColorField({
 
 /**
  * An opacity as a percentage, its digits then %: a colour's beside its hex, and a paint's in its
- * row of the fill list. `value` runs from 0 to 1.
+ * row of the fill list. `value` runs from 0 to 1. Its fill shows the value with no line at its end,
+ * which in a field this narrow would cross the digits.
  */
 export function OpacityField({
   name,
@@ -329,6 +333,7 @@ export function OpacityField({
         min={0}
         max={1}
         unit="%"
+        line={false}
         editor={editor}
         {...(testId ? { testId } : {})}
         onSet={onSet}
