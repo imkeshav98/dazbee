@@ -207,7 +207,35 @@ test('on a phone a tap on ⋯ that its sheet then covers opens the menu and runs
   await entered(menu)
   // The whole sheet shows, and the finger let go where ⋯ was, over its Copy ▸ row, opened nothing.
   await expect(menu.locator('[data-menu-in-place]')).toHaveCount(0)
-  await expect(menu.locator('[role^="menuitem"]')).toHaveCount(fullMenuRows({ group: true }).length)
+  await expect(menu.locator('[role^="menuitem"]')).toHaveCount(fullMenuRows().length)
   expect(await page.evaluate(() => JSON.stringify(window.dazbee?.design()))).toBe(before)
+  expect(errors).toEqual([])
+})
+
+test('Esc that closes a menu goes no further: the full menu and the right-click menu close and the layer stays selected', async ({
+  browser,
+}) => {
+  const { page, errors } = await openAt(browser)
+  const selection = () => page.evaluate(() => window.dazbee?.selection())
+  await selectLayers(page, ['badge'])
+  await page.getByTestId('bar-more').click()
+  await expect(page.getByTestId('bar-more-menu')).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.getByTestId('bar-more-menu')).toBeHidden()
+  expect(await selection()).toEqual(['badge'])
+  const at = await page.evaluate(() => {
+    const box = window.dazbee?.boxOf('badge')
+    return window.dazbee?.screenPoint((box?.x ?? 0) + 100, (box?.y ?? 0) + 100, 'sq')
+  })
+  await page.mouse.click(at?.x ?? 0, at?.y ?? 0, { button: 'right' })
+  const right = page.getByTestId('stage-menu')
+  await expect(right).toBeVisible()
+  await entered(right)
+  await page.keyboard.press('Escape')
+  await expect(right).toBeHidden()
+  expect(await selection()).toEqual(['badge'])
+  // The next Esc is the stage's: it lets the selection go.
+  await page.keyboard.press('Escape')
+  await expect.poll(selection).toEqual([])
   expect(errors).toEqual([])
 })
