@@ -13,7 +13,7 @@
 import { CaretDownIcon } from '@phosphor-icons/react'
 import { type MouseEvent, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 
-import type { Editor } from '@dazbee/editor'
+import type { Camera, Editor } from '@dazbee/editor'
 import type { Design } from '@dazbee/schema'
 
 import { type Target, useTarget } from '@/components/editor/edit-panel/target.ts'
@@ -37,6 +37,18 @@ import { useMessages } from '@/lib/i18n/client.tsx'
 import { arrowAlong, useRovingTab } from './bar-popover.tsx'
 import { useFrameItems } from './frame-items.tsx'
 import { type BarItem, useSelectionItems } from './top-bar-items.tsx'
+
+/** A selection as it was made, for the move that brings it clear under the bar on a phone. */
+type Made = {
+  /** How many presses, wheel turns and keys the page had heard as it was made. */
+  acts: number
+  /** The view it was made in. */
+  base: Camera
+  /** How far above its top the labels of its frames reach, in pixels. */
+  labels: number
+  /** The view as the last move left it, as JSON. */
+  left: string
+}
 
 /** The width a divider takes with its margins, as a tablet or desktop draws it, in pixels. */
 const DIVIDER = 5
@@ -131,25 +143,39 @@ function floorOf(overlay: HTMLElement) {
 }
 
 /**
- * On a phone, once the press that made the selection is up, moves the stage so the selection lies
- * clear under the bar, when it sits under it: the bar takes two rows there and must never cover what
- * it acts on. When the bar's bottom moves for the same selection, as when a selection that grows
- * gives the bar a row, it looks again once the bar has settled into its rows. A look moves nothing
- * once the person has acted since the selection was made, with a press, a wheel or a key, or the
- * view has moved since it was made or last moved clear, so a zoom, a pan, a drag or typing is never
- * followed by a move it didn't ask for. The move never takes the selection under an open flyout or
- * sheet: where it can't clear both, it stops short of them, and the frame's label, or the
- * selection's top, stays under the bar.
+ * The selection as it is now: the acts the page has heard, the view, and how far above the
+ * selection's top the labels of its frames reach. The overlay lights the label of each frame with a
+ * selected layer and places it in the stage's pixels, as the selection's box is.
+ */
+function madeNow(editor: Editor): Made {
+  const camera = editor.camera()
+  const rect = editor.selectionRect()
+  const labels = [...document.querySelectorAll<HTMLElement>('.stage-overlay .frame-label[data-active]')]
+  const top = rect ? Math.min(rect.y, ...labels.map((label) => Number.parseFloat(label.style.top))) : 0
+  return { acts: press.acts, base: camera, labels: rect ? rect.y - top : 0, left: JSON.stringify(camera) }
+}
+
+/**
+ * On a phone, before the stage is next drawn, moves the stage so the selection lies clear under the
+ * bar, when it sits under it: the bar takes two rows there and must never cover what it acts on.
+ * For a selection made by a press, it waits for the press to end. When the bar's bottom moves for the
+ * same selection, as when a selection that grows gives the bar a row, it works the move out again
+ * from the view the selection was made in, so a row the bar measures for a moment leaves the stage
+ * where the settled bar needs it. Nothing moves once the person has acted since the selection was
+ * made, with a press, a wheel or a key, or the view has moved since the last move left it, so a zoom,
+ * a pan, a drag or typing is never followed by a move it didn't ask for. The move never takes the
+ * selection under an open flyout or sheet: where it can't clear both, it stops short of them, and
+ * the frame's label, or the selection's top, stays under the bar.
  */
 function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
   const key = ids.join(' ')
   const { barBottom } = useEditState()
-  // The selection as it was made, or as the bar found it: the acts the page had heard by then, and
-  // the camera then or as the last move clear left it.
-  const made = useRef({ acts: 0, camera: '' })
+  // The selection as it was made: the acts the page had heard by then, the view it was made in, how
+  // far the labels of its frames reach above it, and the view as the last move left it.
+  const made = useRef<Made | null>(null)
   useEffect(() => {
     const mark = () => {
-      made.current = { acts: press.acts, camera: JSON.stringify(editor.camera()) }
+      made.current = madeNow(editor)
     }
     mark()
     const stop = editor.onSelection(mark)
@@ -158,30 +184,27 @@ function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
     }
   }, [editor])
   const clear = useCallback(() => {
-    const rect = editor.selectionRect()
+    const was = made.current
     const overlay = document.querySelector<HTMLElement>('.stage-overlay')
-    const { acts, camera } = made.current
-    if (!rect || !overlay || press.held || press.acts !== acts || JSON.stringify(editor.camera()) !== camera) return
-    // The labels of the selection's frames, lit while a layer in each is selected, are kept clear
-    // too; the overlay places them in the stage's pixels.
-    const labels = [...overlay.querySelectorAll<HTMLElement>('.frame-label[data-active]')]
-    const top = Math.min(rect.y, ...labels.map((label) => Number.parseFloat(label.style.top)))
-    const under = editState().barBottom + CLEAR - top
+    if (!was || !overlay || press.held || press.acts !== was.acts) return
+    if (JSON.stringify(editor.camera()) !== was.left) return
+    const { base } = was
+    editor.setCamera(base)
+    const rect = editor.selectionRect()
+    const under = rect ? editState().barBottom + CLEAR - (rect.y - was.labels) : 0
     if (under > 0) {
-      const camera = editor.camera()
       // The camera's offset is in screen pixels: adding to it moves the design down.
-      editor.setCamera({ ...camera, y: camera.y + under })
+      editor.setCamera({ ...base, y: base.y + under })
       // The selection's size label, held below the chrome while the selection is under it, follows
       // the selection once it is clear, so where the selection ends is read after the move.
       const moved = editor.selectionRect()
       const past = moved ? moved.y + moved.height - (floorOf(overlay) - CLEAR) : 0
-      if (past > 0) editor.setCamera({ ...camera, y: camera.y + Math.max(0, under - past) })
-      made.current = { acts, camera: JSON.stringify(editor.camera()) }
+      if (past > 0) editor.setCamera({ ...base, y: base.y + Math.max(0, under - past) })
     }
+    was.left = JSON.stringify(editor.camera())
   }, [editor])
-  useEffect(() => {
-    if (!phone || key === '') return
-    if (!press.held) return clear()
+  useLayoutEffect(() => {
+    if (!phone || key === '' || !press.held) return
     // After the editor has heard the press end, so the stage moves under no press it reads.
     let frame = 0
     const later = () => {
@@ -193,13 +216,8 @@ function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
       cancelAnimationFrame(frame)
     }
   }, [clear, key, phone])
-  useEffect(() => {
-    if (!phone || key === '') return
-    // Two frames on, as the bar fitting its items into rows measures one row too many for a frame.
-    let frame = requestAnimationFrame(() => {
-      frame = requestAnimationFrame(clear)
-    })
-    return () => cancelAnimationFrame(frame)
+  useLayoutEffect(() => {
+    if (phone && key !== '') clear()
   }, [barBottom, clear, key, phone])
 }
 
