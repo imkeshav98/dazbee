@@ -402,6 +402,27 @@ for (const [width, height] of SCREEN_SIZES) {
   })
 }
 
+test('on a phone the stage moves so the bar, grown by Ctrl+Alt+A, covers no selected frame’s label', async ({
+  browser,
+}) => {
+  const { page, errors } = await openAt(browser, 390, 844)
+  const headline = await middleOf(page, 'headline', 'sq')
+  await page.touchscreen.tap(headline.x, headline.y)
+  await expect(page.getByTestId('top-bar')).toHaveAttribute('data-selection', 'headline')
+  await page.waitForTimeout(300)
+  await press(page, 'selectLinkedCopies')
+  await expect(page.getByTestId('top-bar')).toHaveAttribute('data-selection', everyCopy('headline').join(' '))
+  const clearOfBar = async () => {
+    const bar = await page.getByTestId('top-bar').boundingBox()
+    const labels = await page
+      .locator('.stage-overlay .frame-label[data-active]')
+      .evaluateAll((els) => els.map((el) => el.getBoundingClientRect().top))
+    return bar !== null && labels.length === 3 && labels.every((top) => top >= bar.y + bar.height)
+  }
+  await expect.poll(clearOfBar).toBe(true)
+  expect(errors).toEqual([])
+})
+
 for (const [width, height] of SCREEN_SIZES) {
   for (const theme of THEMES) {
     test(

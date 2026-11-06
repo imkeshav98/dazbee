@@ -118,23 +118,25 @@ function floorOf(overlay: HTMLElement) {
 
 /**
  * On a phone, once no press is held, moves the stage so the selection lies clear under the bar,
- * when it sits under it: the bar takes two rows there and must never cover what it acts on. The
+ * when it sits under it: the bar takes two rows there and must never cover what it acts on. It
+ * looks again once the bar's bottom moves, as when a selection that grows gives the bar a row. The
  * move never takes the selection under an open flyout or sheet: where it can't clear both, it
  * stops short of them, and the frame's label, or the selection's top, stays under the bar.
  */
 function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
   const key = ids.join(' ')
+  const { barBottom } = useEditState()
   useEffect(() => {
     if (!phone || key === '') return
     const clear = () => {
       const rect = editor.selectionRect()
       const overlay = document.querySelector<HTMLElement>('.stage-overlay')
       if (!rect || !overlay) return
-      // The selection's frame label, lit while a layer in it is selected, is kept clear too; the
-      // overlay places it in the stage's pixels.
-      const label = overlay.querySelector<HTMLElement>('.frame-label[data-active]')
-      const top = Math.min(rect.y, label ? Number.parseFloat(label.style.top) : Infinity)
-      const under = editState().barBottom + CLEAR - top
+      // The labels of the selection's frames, lit while a layer in each is selected, are kept clear
+      // too; the overlay places them in the stage's pixels.
+      const labels = [...overlay.querySelectorAll<HTMLElement>('.frame-label[data-active]')]
+      const top = Math.min(rect.y, ...labels.map((label) => Number.parseFloat(label.style.top)))
+      const under = barBottom + CLEAR - top
       if (under <= 0) return
       const camera = editor.camera()
       // The camera's offset is in screen pixels: adding to it moves the design down.
@@ -156,7 +158,7 @@ function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
       window.removeEventListener('pointerup', later)
       cancelAnimationFrame(frame)
     }
-  }, [editor, key, phone])
+  }, [editor, key, phone, barBottom])
 }
 
 /**
