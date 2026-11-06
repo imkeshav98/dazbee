@@ -30,3 +30,7 @@ export const format = (template: string, values: Record<string, string | number>
  */
 export const counted = (locale: Locale, words: Counted, n: number) =>
   format(words[new Intl.PluralRules(locale).select(n)] ?? words.other, { n })
+
+/** How many designs a brand has, in a locale's plural rules, or that it has none yet. */
+export const designCount = (locale: Locale, t: Messages, n: number) =>
+  n === 0 ? t.library.noDesignsCount : counted(locale, t.library.designCount, n)

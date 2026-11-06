@@ -53,3 +53,24 @@ test('a design id from another brand is not found', async ({ page, allowProblems
   const response = await page.goto(`/brands/dev-brand-coffee/designs/${designId}`)
   expect(response?.status()).toBe(404)
 })
+
+test('a brand with one design counts it in the singular', async ({ page }) => {
+  test.setTimeout(60_000)
+  const name = `Single Origin ${crypto.randomUUID().slice(0, 4)}`
+  await page.goto('/')
+  const brands = page.getByRole('list', { name: 'Brands' })
+  await brands.getByRole('button', { name: 'New brand' }).click()
+  await brands.getByRole('textbox', { name: 'Website or name' }).fill(name)
+  await brands.getByRole('button', { name: 'Create' }).click()
+  await expect(page).toHaveURL(/\/brands\/[0-9a-z]{12}$/)
+  const home = page.url()
+  await page.getByLabel('Brief').fill('Only one')
+  await page.getByRole('button', { name: 'Make drafts' }).click()
+  await expect(page).toHaveURL(/\/designs\/[0-9a-z]{12}$/, { timeout: 20_000 })
+
+  await page.goto(`${home}/designs`)
+  await expect(page.getByRole('main')).toContainText('1 design')
+  await expect(page.getByRole('main')).not.toContainText('1 designs')
+  await page.goto('/')
+  await expect(brands.getByRole('link', { name: new RegExp(`^${name}`) })).toContainText(/1 design$/)
+})

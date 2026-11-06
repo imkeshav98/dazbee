@@ -9,7 +9,7 @@ import { DesignMasonry, type MasonryDesign } from '@/components/library/design-m
 import { FilterChips } from '@/components/library/filter-chips.tsx'
 import { LibraryShell } from '@/components/library/library-shell.tsx'
 import { showsBrandList } from '@/lib/home.ts'
-import { brandWords, format } from '@/lib/i18n/index.ts'
+import { brandWords, designCount, format } from '@/lib/i18n/index.ts'
 import { getLocale, getMessages } from '@/lib/i18n/server.ts'
 import { designCover, getWorkspace, listBrands, listDesigns } from '@/lib/server/api.ts'
 
@@ -62,9 +62,7 @@ export default async function DesignsPage({
           <h1 className="font-display text-3xl font-bold tracking-tight md:text-[2.5rem] md:leading-tight">
             {t.home.recent}
           </h1>
-          <span className="text-sm font-medium text-muted tabular-nums">
-            {designs.length > 0 ? format(t.home.count, { count: designs.length }) : l.noDesignsCount}
-          </span>
+          <span className="text-sm font-medium text-muted tabular-nums">{designCount(locale, t, designs.length)}</span>
         </div>
         {designs.length > 0 && (
           <FilterChips
