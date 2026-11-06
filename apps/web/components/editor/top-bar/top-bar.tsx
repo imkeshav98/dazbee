@@ -119,7 +119,8 @@ function floorOf(overlay: HTMLElement) {
 /**
  * On a phone, once no press is held, moves the stage so the selection lies clear under the bar,
  * when it sits under it: the bar takes two rows there and must never cover what it acts on. It
- * looks again once the bar's bottom moves, as when a selection that grows gives the bar a row. The
+ * looks again once the bar's bottom moves, as when a selection that grows gives the bar a row, once
+ * the bar has settled into its rows. The
  * move never takes the selection under an open flyout or sheet: where it can't clear both, it
  * stops short of them, and the frame's label, or the selection's top, stays under the bar.
  */
@@ -136,7 +137,7 @@ function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
       // too; the overlay places them in the stage's pixels.
       const labels = [...overlay.querySelectorAll<HTMLElement>('.frame-label[data-active]')]
       const top = Math.min(rect.y, ...labels.map((label) => Number.parseFloat(label.style.top)))
-      const under = barBottom + CLEAR - top
+      const under = editState().barBottom + CLEAR - top
       if (under <= 0) return
       const camera = editor.camera()
       // The camera's offset is in screen pixels: adding to it moves the design down.
@@ -147,13 +148,16 @@ function useSelectionClear(editor: Editor, ids: string[], phone: boolean) {
       const past = moved ? moved.y + moved.height - (floorOf(overlay) - CLEAR) : 0
       if (past > 0) editor.setCamera({ ...camera, y: camera.y + Math.max(0, under - past) })
     }
-    if (!press.held) return clear()
-    // After the editor has heard the press end, so the stage moves under no press it reads.
+    // Two frames on, as the bar fitting its items into rows measures one row too many for a frame.
     let frame = 0
     const later = () => {
-      frame = requestAnimationFrame(clear)
+      frame = requestAnimationFrame(() => {
+        frame = requestAnimationFrame(clear)
+      })
     }
-    window.addEventListener('pointerup', later, { once: true })
+    // After the editor has heard the press end, so the stage moves under no press it reads.
+    if (press.held) window.addEventListener('pointerup', later, { once: true })
+    else later()
     return () => {
       window.removeEventListener('pointerup', later)
       cancelAnimationFrame(frame)
