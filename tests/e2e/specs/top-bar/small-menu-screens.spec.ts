@@ -61,7 +61,7 @@ const withCorner = () => {
 
 /**
  * What covers what: the small menu over each frame label it meets, and the size label's reach past
- * the screen or over the chrome.
+ * the screen, over a frame's label or over the chrome.
  */
 const problems = (page: Page) =>
   page.evaluate((chrome) => {
@@ -80,7 +80,12 @@ const problems = (page: Page) =>
     if (!size) found.push('no size label')
     else if (size.left < 0 || size.right > width || size.top < 0 || size.bottom > window.innerHeight)
       found.push(`the size label (${Math.round(size.left)}–${Math.round(size.right)}) runs off the screen (${width})`)
-    else
+    else {
+      for (const label of document.querySelectorAll<HTMLElement>('.stage-overlay .frame-label')) {
+        const box = label.getBoundingClientRect()
+        if (size.left < box.right && box.left < size.right && size.top < box.bottom && box.top < size.bottom)
+          found.push(`the size label covers the ${label.dataset.frame} label`)
+      }
       for (const piece of chrome)
         for (const el of document.querySelectorAll(piece)) {
           const box = el.getBoundingClientRect()
@@ -93,6 +98,7 @@ const problems = (page: Page) =>
           )
             found.push(`the size label is under ${piece}`)
         }
+    }
     return found
   }, CHROME)
 
