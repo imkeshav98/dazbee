@@ -176,6 +176,28 @@ test.describe('found by review', () => {
     expect(errors).toEqual([])
   })
 
+  test('at 820×1180 on a touch screen every swatch-like control is a 44 px target 8 px from the next, as on a phone', async ({
+    browser,
+  }) => {
+    const brandId = await newBrand('e2e tablet swatches')
+    await putKit(brandId, SWATCH_KIT)
+    const { page, errors } = await openSized(
+      browser,
+      { width: 820, height: 1180 },
+      { brandId, touch: true, mobile: true },
+    )
+    for (const { name, open, controls } of SWATCH_PANELS) {
+      const panel = await open(page)
+      const room = await panel.boundingBox()
+      if (!room) throw new Error(`${name} has no box`)
+      for (const control of controls)
+        expectTouchTargets(await swatchTouches(panel, control), `${name}, ${control.control}`, room)
+      await page.keyboard.press('Escape')
+      await expect(page.locator('#edit-panel')).toHaveCount(0)
+    }
+    expect(errors).toEqual([])
+  })
+
   test('at 1280×760 the swatch-like controls keep their size and the space between them', async ({ browser }) => {
     const brandId = await newBrand('e2e desktop swatches')
     await putKit(brandId, SWATCH_KIT)
