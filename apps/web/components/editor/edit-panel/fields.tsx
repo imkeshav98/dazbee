@@ -5,10 +5,10 @@
 // segments.
 import { type CSSProperties, type ReactNode, useRef, useState } from 'react'
 
-import { type Editor, shortcutFor } from '@dazbee/editor'
+import type { Editor } from '@dazbee/editor'
 import { alphaOf } from '@dazbee/schema'
 
-import { NumberInput, useNumberInput } from '@/components/editor/number-input.tsx'
+import { NumberInput, numberKeyDown, useNumberInput } from '@/components/editor/number-input.tsx'
 import {
   FACE_SIZE,
   FIELD,
@@ -199,33 +199,16 @@ export function NumberField({
         onBlur={(event) => {
           if (typedNow.current !== null) commit(event.target.value)
         }}
-        onKeyDown={(event) => {
-          // Undo and redo are the design's while nothing is being typed; once something is, the
-          // field's own, taking back what was typed.
-          const action = shortcutFor(event.nativeEvent)
-          if (editor && typedNow.current === null && (action === 'undo' || action === 'redo')) {
-            event.preventDefault()
-            editor.perform(action)
-          } else if (event.key === 'Enter') commit(event.currentTarget.value)
-          else if (event.key === 'Escape') {
-            // What was typed is thrown away and the field keeps the focus, its value chosen again;
-            // with nothing typed, the field lets go of the focus.
-            const typed = typedNow.current !== null
-            setDraft(null)
-            if (typed) entry.reselect()
-            else event.currentTarget.blur()
-          } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-            event.preventDefault()
-            setDraft(null)
-            shift(((event.key === 'ArrowUp' ? 1 : -1) * stepOf(event)) / scale)
-          } else if ((event.key === 'Home' || event.key === 'End') && hasEnds && draft === null) {
-            // A range's ends, as a slider's; while a value is being typed they move the caret.
-            event.preventDefault()
-            onSet(event.key === 'Home' ? min : max)
-          } else return
-          // Keys typed into a field are the field's, not the stage's.
-          event.stopPropagation()
-        }}
+        onKeyDown={(event) =>
+          numberKeyDown(event, entry, {
+            editor,
+            typed: typedNow.current !== null,
+            commit,
+            discard: () => setDraft(null),
+            step: (sign, keys) => shift((sign * stepOf(keys)) / scale),
+            ends: hasEnds && draft === null ? { home: () => onSet(min), end: () => onSet(max) } : undefined,
+          })
+        }
       />
       {unit && (shown !== '' || !!draft) && (
         // Against the digits: back over the gap, and over the input's room for the caret where that

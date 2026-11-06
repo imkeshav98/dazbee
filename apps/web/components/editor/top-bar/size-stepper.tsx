@@ -3,10 +3,8 @@
 import { MinusIcon, PlusIcon } from '@phosphor-icons/react'
 import { useState } from 'react'
 
-import { shortcutFor } from '@dazbee/editor'
-
 import { type Target, textStyle } from '@/components/editor/edit-panel/target.ts'
-import { NumberInput, useNumberInput } from '@/components/editor/number-input.tsx'
+import { NumberInput, numberKeyDown, useNumberInput } from '@/components/editor/number-input.tsx'
 import { LIMITS } from '@/lib/editor/limits.ts'
 import { latinDigits } from '@/lib/editor/size.ts'
 import { useMessages } from '@/lib/i18n/client.tsx'
@@ -62,35 +60,15 @@ export function SizeStepper({ target }: { target: Target }) {
           aria-label={t.editor.props.fontSize}
           data-testid="bar-size-field"
           onChange={(event) => setDraft(event.target.value)}
-          onKeyDown={(event) => {
-            event.stopPropagation()
-            // Undo and redo are the design's while nothing is being typed, as in the panels' fields.
-            const action = shortcutFor(event.nativeEvent)
-            if (draft === null && (action === 'undo' || action === 'redo')) {
-              event.preventDefault()
-              target.editor.perform(action)
-              return
-            }
-            if (event.key === 'Enter') commit(event.currentTarget.value)
-            if (event.key === 'Escape') {
-              // What was typed is thrown away, its size chosen again, so a size typed next replaces it;
-              // with nothing typed, the field lets go of the focus.
-              if (draft !== null) entry.reselect()
-              else event.currentTarget.blur()
-              setDraft(null)
-            }
-            if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
-              event.preventDefault()
-              setDraft(null)
-              shiftStyle(
-                'fontSize',
-                (event.key === 'ArrowUp' ? 1 : -1) * (event.shiftKey ? 10 : 1),
-                1,
-                0,
-                LIMITS.fontSize,
-              )
-            }
-          }}
+          onKeyDown={(event) =>
+            numberKeyDown(event, entry, {
+              editor: target.editor,
+              typed: draft !== null,
+              commit,
+              discard: () => setDraft(null),
+              step: (sign, keys) => shiftStyle('fontSize', sign * (keys.shiftKey ? 10 : 1), 1, 0, LIMITS.fontSize),
+            })
+          }
           onBlur={(event) => draft !== null && commit(event.currentTarget.value)}
         />
       </div>
