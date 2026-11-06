@@ -293,9 +293,10 @@ describe('editorOverlay', () => {
       })
 
       it('goes under the selection, over it when the chrome along the bottom would cover it', () => {
-        // The selection's bottom at 680 px: room under it for the dock, not for a phone's dock and tab bar.
+        // The selection's bottom at 680 px: room under it for the dock, not for a phone's dock and tab bar,
+        // where over it the size goes above its frame's label rather than on it.
         expect(topOf(570)).toBe('688px')
-        expect(topOf(570, { insets: { ...NONE, bottom: 121 } })).toBe('554px')
+        expect(topOf(570, { insets: { ...NONE, bottom: 121 } })).toBe('522px')
       })
 
       it('keeps over the chrome along the bottom when the selection is beside it, and under the chrome along the top', () => {

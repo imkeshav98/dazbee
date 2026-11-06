@@ -288,17 +288,21 @@ export function editorOverlay({
     if (span.right <= 0) size.style.left = px(Math.min(centred, -width))
     else if (span.left >= room) size.style.left = px(Math.max(centred, room))
     else size.style.left = px(Math.max(low, Math.min(centred, high)))
-    const labels = [...overlay.querySelectorAll<HTMLElement>('.frame-label')]
+    const labels = view.inView().flatMap((frame) => labelBox(frame, view.camera()) ?? [])
     const { floor, ceiling } = sizeLabelRoom()
+    const left = Number.parseFloat(size.style.left)
     for (let tries = 0; tries < labels.length; tries++) {
-      const at = size.getBoundingClientRect()
-      const under = labels
-        .map((label) => label.getBoundingClientRect())
-        .find((box) => at.left < box.right && box.left < at.right && at.top < box.bottom && box.top < at.bottom)
+      const top = Number.parseFloat(size.style.top)
+      const under = labels.find(
+        (box) =>
+          left < box.x + box.width &&
+          box.x < left + width &&
+          top < box.y + box.height &&
+          box.y < top + SIZE_LABEL_HEIGHT,
+      )
       if (!under) return
-      const top = size.offsetTop + (under.top - at.top)
-      const above = top - at.height - LABEL_GAP
-      size.style.top = px(above >= ceiling ? above : Math.min(floor, top + under.height + LABEL_GAP))
+      const above = under.y - SIZE_LABEL_HEIGHT - LABEL_GAP
+      size.style.top = px(above >= ceiling ? above : Math.min(floor, under.y + under.height + LABEL_GAP))
     }
   }
 
