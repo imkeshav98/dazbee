@@ -1,7 +1,8 @@
-// The rows the editor's layer menus show, in order, as the specs check them: the full menu (the
-// small menu's ⋯ and a right-click on a layer) with the menus beside its rows; and readers of the
-// rows a menu shows. A picked frame's ⋯ keeps its own list in frames-on-canvas.ts, and the top
-// bar's controls are in bar-homes.ts.
+// The rows every menu of the app shows, in order, as the specs check them: the full menu (the
+// small menu's ⋯ and a right-click on a layer) with the menus beside its rows, the right-click menu
+// on empty canvas, Share, the shape menu, the zoom menu, a page card's ⋯ and a library tile's ⋯;
+// and readers of the rows a menu shows. A picked frame's ⋯ keeps its own list in
+// frames-on-canvas.ts, and the top bar's controls are in bar-homes.ts.
 import type { Locator, Page } from './test.ts'
 
 /**
@@ -51,6 +52,56 @@ export const FULL_MENU_BESIDE: Record<'copy' | 'paste' | 'copy-to-frames', reado
     { id: 'layerToLinked', name: 'Layer', reads: 'Layer' },
   ],
 }
+/** The right-click menu's one row on empty canvas, while the frame there has hidden layers. */
+export const CANVAS_MENU: readonly Row[] = [
+  { id: 'showHidden', name: 'Show hidden layers', reads: 'Show hidden layers' },
+]
+/** Share's rows, by their test ids. */
+export const SHARE_MENU: readonly Row[] = [
+  { id: 'export-open', name: 'Export', reads: 'Export' },
+  { id: 'template-open', name: 'Save as template', reads: 'Save as template' },
+]
+/** The dock's shape menu, by each row's `data-shape`: one is picked, the shape the tool draws. */
+export const SHAPE_MENU: readonly Row[] = [
+  { id: 'rect', name: 'Rectangle', reads: 'RectangleR' },
+  { id: 'ellipse', name: 'Ellipse', reads: 'EllipseO' },
+  { id: 'box', name: 'Box', reads: 'Box' },
+  { id: 'polygon', name: 'Polygon', reads: 'Polygon' },
+  { id: 'star', name: 'Star', reads: 'Star' },
+  { id: 'line', name: 'Line', reads: 'LineL' },
+  { id: 'arrow', name: 'Arrow', reads: 'ArrowShift+L' },
+]
+/** The zoom menu: its zooms, then the two rows that turn the rulers and snapping on and off. */
+export const ZOOM_MENU: readonly (Row & { check?: true })[] = [
+  { id: 'zoomIn', name: 'Zoom in', reads: 'Zoom inCtrl+=' },
+  { id: 'zoomOut', name: 'Zoom out', reads: 'Zoom outCtrl+-' },
+  { id: 'zoomFit', name: 'Zoom to fit', reads: 'Zoom to fitShift+1' },
+  { id: 'zoomSelection', name: 'Zoom to selection', reads: 'Zoom to selectionShift+2' },
+  { id: 'zoom100', name: 'Zoom to 100%', reads: 'Zoom to 100%Ctrl+0' },
+  { id: 'rulers', name: 'Rulers', reads: 'RulersShift+R', check: true },
+  { id: 'snap', name: 'Snap while dragging', reads: 'Snap while dragging', check: true },
+]
+/** A page card's ⋯ on the Pages card, the last after a line. */
+export const PAGE_MENU: readonly Row[] = [
+  { id: 'rename', name: 'Rename', reads: 'Rename' },
+  { id: 'duplicate', name: 'Duplicate page', reads: 'Duplicate page' },
+  { id: 'moveUp', name: 'Move up', reads: 'Move up' },
+  { id: 'moveDown', name: 'Move down', reads: 'Move down' },
+  { id: 'remove', name: 'Delete page', reads: 'Delete page' },
+]
+/** Why a page card's ⋯ greys a row, by the row's id. */
+export const PAGE_MENU_WHY = {
+  moveUp: 'This page is first already',
+  moveDown: 'This page is last already',
+  remove: 'A design keeps at least one page',
+} as const
+/** A library tile's ⋯, for a design; a template's has no Duplicate. */
+export const TILE_MENU: readonly (Row & { design?: true })[] = [
+  { id: 'rename', name: 'Rename', reads: 'Rename' },
+  { id: 'duplicate', name: 'Duplicate', reads: 'Duplicate', design: true },
+  { id: 'delete', name: 'Delete', reads: 'Delete' },
+]
+
 /** The words of a row of any of the lists above, by its id. */
 export function rowName(id: string) {
   const rows = [...FULL_MENU, RELEASE_MASK, ...Object.values(FULL_MENU_BESIDE).flat()]
@@ -64,9 +115,11 @@ export const fullMenuRows = ({ group = false } = {}) =>
 /** The rows of the menu beside the full menu's row `more-<id>`, by their words: Text only for text layers. */
 export const besideRows = (id: keyof typeof FULL_MENU_BESIDE, { text = false } = {}) =>
   FULL_MENU_BESIDE[id].filter((row) => text || !row.text).map((row) => row.name)
-/** A row of a menu by its id in the lists above: the first button whose name starts with its words. */
-export const rowIn = (menu: Locator, id: string) =>
-  menu.getByRole('button', { name: new RegExp(`^${rowName(id)}`) }).first()
+/** The first menu item of a menu whose words start with `name`, of any kind: a row, a check or a pick. */
+export const namedRow = (menu: Locator, name: string) =>
+  menu.locator('[role^="menuitem"]').filter({ hasText: new RegExp(`^${name}`) }).first()
+/** A row of a menu by its id in the lists above: the first menu item whose words start with its words. */
+export const rowIn = (menu: Locator, id: string) => namedRow(menu, rowName(id))
 /** The words of each row that shows in a menu, in order, as they read on screen: a key that shows reads too. */
 export const shownRows = (menu: Locator) =>
   menu

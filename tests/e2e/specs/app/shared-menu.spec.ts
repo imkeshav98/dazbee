@@ -165,9 +165,11 @@ for (const arabic of [false, true])
 
     const backRow = menu.getByTestId('more-copy-back')
     const shownWords = () =>
-      menu.locator('[role^="menuitem"]').evaluateAll((rows) =>
-        rows.filter((row) => row.checkVisibility()).map((row) => row.firstChild?.textContent?.trim() ?? ''),
-      )
+      menu
+        .locator('[role^="menuitem"]')
+        .evaluateAll((rows) =>
+          rows.filter((row) => row.checkVisibility()).map((row) => row.firstChild?.textContent?.trim() ?? ''),
+        )
     for (const how of ['back row', 'arrow', 'Esc'] as const) {
       await menu.getByTestId('more-copy').focus()
       await page.keyboard.press(toward)
