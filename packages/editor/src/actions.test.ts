@@ -206,6 +206,27 @@ describe('editorActions', () => {
         ])
       })
 
+      it("keeps a frame's layers selected when its change selects nothing new: one layer masks, several are grouped", () => {
+        const { actions, session, selection, frame, wide } = harness()
+        selection.selectAcross([...pairsIn(frame.id, ['a', 'b']), ...pairsIn(wide.id, ['wide-a'])])
+        actions.perform('mask')
+        const [group, ...rest] = selection.current() ?? []
+        expect(session.design().nodes[group?.id ?? '']?.type).toBe('group')
+        expect(rest).toEqual(pairsIn(wide.id, ['wide-a']))
+        expect(session.design().nodes['wide-a']?.props.mask).toBe('alpha')
+      })
+
+      it('moves the copies a lock leaves free, the one locked in place staying', () => {
+        const { actions, session, selection, frame, wide, at } = harness()
+        session.run('node.lock', { ids: ['a'], lock: { move: true } })
+        selection.selectAcross([...pairsIn(wide.id, ['wide-a']), ...pairsIn(frame.id, ['a'])])
+        actions.perform('nudgeRight')
+        expect([at('wide-a'), at('a')]).toEqual([
+          { x: 101, y: 100 },
+          { x: 100, y: 100 },
+        ])
+      })
+
       it('duplicates the selected layers in their own frames, selecting the new ones', () => {
         const { actions, session, selection, frame, wide } = harness()
         selection.selectAcross([...pairsIn(frame.id, ['a']), ...pairsIn(wide.id, ['wide-a'])])

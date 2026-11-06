@@ -58,6 +58,25 @@ async function selectCopies(page: Page, id: string) {
   await expect(page.getByTestId('top-bar')).toHaveAttribute('data-selection', everyCopy(id).join(' '))
 }
 
+/** Opens the design at a screen size, in a theme, with a finger on the phone, its page fitted. */
+async function openAt(browser: Parameters<typeof open>[0], width: number, height: number, theme = 'dark') {
+  const asset = await upload(photo)
+  const phone = width < 600
+  return openSized(
+    browser,
+    { width, height },
+    { theme, input: linkedMenuDesign(asset.id), touch: phone, mobile: phone },
+  )
+}
+/** The headline in the square and the landscape, picked as the stage picks them: their sizes and X differ. */
+async function selectTwoFrames(page: Page) {
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
+  await selectLayers(page, ['headline'])
+  await press(page, 'selectLinkedCopies')
+  await page.evaluate(() => window.dazbee?.toggleSelected('story-headline'))
+  await expect(page.getByTestId('top-bar')).toHaveAttribute('data-selection', 'headline wide-headline')
+}
+
 test('Ctrl+Alt+A selects the linked copies of each layer type in every linked frame of the page, each frame outlined', async ({
   browser,
 }) => {
@@ -256,7 +275,7 @@ test('inside a group and inside an auto layout box, the copies are found and cha
   expect(errors).toEqual([])
 })
 
-test('a copy locked in place in one frame is left out, and one hidden in another is changed and stays hidden', async ({
+test('a copy locked in one frame is left out, as select all leaves it, and one hidden in another is changed and stays hidden', async ({
   browser,
 }) => {
   const { page, errors } = await open(browser)
@@ -264,7 +283,7 @@ test('a copy locked in place in one frame is left out, and one hidden in another
   const wide = copyIn('wide', 'badge')
   await page.evaluate(
     ({ locked, hidden }) => {
-      window.dazbee?.setLocked([locked], true)
+      window.dazbee?.session.run('node.lock', { ids: [locked], lock: { move: true } })
       window.dazbee?.setHidden([hidden], true)
     },
     { locked: story, hidden: wide },
@@ -272,19 +291,18 @@ test('a copy locked in place in one frame is left out, and one hidden in another
   await selectLayers(page, ['badge'])
   await press(page, 'selectLinkedCopies')
   expect(await selection(page)).toEqual(['badge', wide])
-  await expect(page.locator('.stage-overlay .linked-copy')).toHaveCount(1)
+  // The locked copy keeps its dashed outline, so you see where else the layer is.
+  await expect(page.locator('.stage-overlay .linked-copy')).toHaveAttribute('data-layer', story)
   const card = await openCard(page, 'layout-card')
   await enter(card.getByRole('spinbutton', { name: 'Y position' }), '200')
   await expect.poll(async () => [(await placeOf(page, 'badge')).y, (await placeOf(page, wide)).y]).toEqual([200, 200])
   expect((await placeOf(page, story)).y).toBe(1080)
   expect((await node(page, wide))?.props.visible).toBe(false)
-  // The locked copy can still be reached from the canvas: Shift and a click adds it, a click selects
-  // it alone, and the lock key frees it.
+  // Shift and a click adds the locked copy; the bar then offers to unlock, and one click frees it.
+  await page.keyboard.press('Escape')
   await clickOn(page, story, 'story', true)
   expect(await selection(page)).toEqual(['badge', wide, story])
-  await clickOn(page, story, 'story')
-  expect(await selection(page)).toEqual([story])
-  await press(page, 'lock')
+  await page.getByTestId('bar-unlock').click()
   await expect.poll(async () => (await node(page, story))?.lock?.move ?? false).toBe(false)
   expect(errors).toEqual([])
 })
@@ -346,25 +364,6 @@ test('the keyboard shortcuts dialog lists Ctrl+Alt+A, in English and Arabic', as
   await expect(row.locator('kbd')).toHaveText(['Ctrl', 'Alt', 'A'])
   expect(errors).toEqual([])
 })
-
-/** Opens the design at a screen size, in a theme, with a finger on the phone, its page fitted. */
-async function openAt(browser: Parameters<typeof open>[0], width: number, height: number, theme = 'dark') {
-  const asset = await upload(photo)
-  const phone = width < 600
-  return openSized(
-    browser,
-    { width, height },
-    { theme, input: linkedMenuDesign(asset.id), touch: phone, mobile: phone },
-  )
-}
-/** The headline in the square and the landscape, picked as the stage picks them: their sizes and X differ. */
-async function selectTwoFrames(page: Page) {
-  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur())
-  await selectLayers(page, ['headline'])
-  await press(page, 'selectLinkedCopies')
-  await page.evaluate(() => window.dazbee?.toggleSelected('story-headline'))
-  await expect(page.getByTestId('top-bar')).toHaveAttribute('data-selection', 'headline wide-headline')
-}
 
 for (const [width, height] of SCREEN_SIZES) {
   test(`at ${width}×${height} copies selected in two frames show Mixed in the bar and the Position panel, clear of everything; a finger drag moves both`, async ({

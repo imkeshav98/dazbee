@@ -134,7 +134,7 @@ export function localTo(p: Point, around: Box[]): Point {
   return q
 }
 /** A step across the frame as layers inside containers see it: turned back by every container's turn. */
-export const localStep = (step: Point, around: Box[]) => turnStep(step, -around.reduce((r, b) => r + b.rotation, 0))
+export const localStep = (step: Point, around: Box[]) => turnStep(step, -turnOf(around))
 /** A step inside containers as it goes across the frame: turned by every container's turn. */
 export const frameStep = (step: Point, around: Box[]) =>
   turnStep(
@@ -192,4 +192,8 @@ export function boxAt(outer: Box, handle: Handle, factor: number, fromCentre: bo
 /** A step turned by an angle, in degrees. */
 function turnStep(step: Point, degrees: number): Point {
   return turn(step, { x: 0, y: 0 }, degrees)
+}
+/** How far containers turn what they hold, in all, in degrees. */
+function turnOf(around: Box[]) {
+  return around.reduce((r, b) => r + b.rotation, 0)
 }

@@ -52,9 +52,9 @@ export interface MovePart {
   boxes: Map<string, Box>
 }
 /**
- * A drag moving the selection, from the press until it ends: one undo step. The first selected
- * layer's frame is dragged and snaps; `copies` holds the selected layers of the other frames, moved
- * by the same amount.
+ * A drag moving the selection, from the press until it ends: one undo step. The frame pressed in
+ * is dragged and snaps; `copies` holds the selected layers of the other frames, moved by the same
+ * amount.
  */
 export interface MoveDrag extends MovePart {
   kind: 'move'

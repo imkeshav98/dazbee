@@ -13,8 +13,8 @@ export interface Picked {
 }
 /**
  * The selected layers, each with its frame, in the order they were picked; never empty. They sit in
- * one frame, or in several frames of one page once linked copies join them (Ctrl+Alt+A, or Shift
- * and a click on a copy). The first one's frame is the one the selection's box and handles go in.
+ * one frame or in several frames of one page, such as linked copies Ctrl+Alt+A or Shift and a
+ * click added. The first one's frame is the one the selection's box and handles go in.
  */
 export type Selection = readonly Picked[]
 /** The path layer whose points are being edited (#45), and which of its anchors are selected. */
@@ -117,6 +117,9 @@ export interface EditorSelection {
 /** The selected layers' ids, in the order they were picked; none with nothing selected. */
 export const idsOf = (selection: Selection | null) => selection?.map((layer) => layer.id) ?? []
 
+/** Whether two pairs name the same layer in the same frame. */
+export const samePick = (a: Picked, b: Picked) => a.id === b.id && a.frameId === b.frameId
+
 /** Layers of one frame as selection pairs, in order. */
 export const pairsIn = (frameId: string, ids: readonly string[]): Picked[] => ids.map((id) => ({ id, frameId }))
 
@@ -204,7 +207,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
   /** Whether a layer is all the selection holds. */
   function onlyLayer(layer: Picked) {
     const [only] = selection ?? []
-    return selection?.length === 1 && only?.id === layer.id && only.frameId === layer.frameId
+    return selection?.length === 1 && only !== undefined && samePick(only, layer)
   }
   /** With nothing selected there is no crop and no path edit. */
   function endModesWhenNone() {
@@ -220,7 +223,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
   }
   /** Keeps the first selected layer's frame as the one last selected in on its page. */
   function rememberFrame() {
-    const frame = frameOf(selection?.[0]?.frameId)
+    const frame = frameOf(firstFrameOf(selection))
     if (frame) lastFrames.set(frame.pageId, frame.id)
   }
   function keep() {
@@ -230,7 +233,7 @@ export function editorSelection({ drawn, frames, changed }: SelectionDeps): Edit
     const kept = selection.filter((layer) => design.nodes[layer.id] && frameOf(layer.frameId))
     selection = kept.length > 0 ? kept : null
     if (entered && !design.nodes[entered]) entered = null
-    const holds = (layer: Picked) => kept.some((p) => p.id === layer.id && p.frameId === layer.frameId)
+    const holds = (layer: Picked) => kept.some((p) => samePick(p, layer))
     if (pathEditing && (!kept.some((p) => p.id === pathEditing?.id) || !isPath(design, pathEditing.id)))
       pathEditing = null
     if (cropping && !holds(cropping)) cropping = null

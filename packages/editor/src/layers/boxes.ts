@@ -13,7 +13,7 @@ import { findLayer, type FrameScenes } from '../canvas/scenes.ts'
 import { coverCrop, imageRect, type Size } from '../gestures/crop/crop.ts'
 import { offsetPath, parsePath, type PenPath, scalePath } from '../gestures/pen/path.ts'
 import type { EditorResources } from '../resources.ts'
-import { type EditorSelection, idsOf } from '../selection.ts'
+import { type EditorSelection, firstFrameOf, idsOf } from '../selection.ts'
 import { laidOut, placedInside, propIn } from './auto-layout.ts'
 import { boundsOf, type Box, centreOf, drawnFrom, type Handle, HANDLES, normalAngle, turn } from './transform.ts'
 
@@ -178,7 +178,7 @@ export function editorBoxes({ session, scenes, resources, selection, drawn, fram
    */
   function handlesFor(): readonly Handle[] {
     const current = selection.current()
-    const frame = frameOf(current?.[0]?.frameId)
+    const frame = frameOf(firstFrameOf(current))
     if (!current || !frame || lockedSelection() || byFrame(current).length > 1) return []
     const ids = idsOf(current)
     const [only] = ids

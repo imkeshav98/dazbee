@@ -38,6 +38,7 @@ const fakeDesign = () =>
       'f2-child': graphic('f2-group', 'C'),
       'f3-rect': graphic('p1-f3', 'R', { lock: { move: true } }),
       'f3-path': graphic('p1-f3', 'P'),
+      'f2-path': graphic('p1-f2', 'P', { lock: { style: true } }),
       'p2-rect': graphic('p2-f1', 'R'),
     },
   }) as unknown as Design
@@ -94,8 +95,13 @@ describe('withCopies', () => {
     ])
   })
 
-  it('leaves out copies locked in place, as select all does, and copies already selected', () => {
+  it('leaves out copies locked against any change, as select all does, and copies already selected', () => {
     const design = fakeDesign()
+    // The rect's copy in the third frame is locked in place, the path's in the second against style.
+    expect(withCopies(pairs('p1-f1', 'path'), design)).toEqual([
+      ...pairs('p1-f1', 'path'),
+      ...pairs('p1-f3', 'f3-path'),
+    ])
     const start = [...pairs('p1-f1', 'rect'), ...pairs('p1-f2', 'f2-rect')]
     expect(withCopies(start, design)).toEqual(start)
   })

@@ -11,7 +11,7 @@ import { type Frame, labelTextAt } from '../canvas/frames.ts'
 import type { EditorView } from '../canvas/view.ts'
 import type { EditorBoxes } from '../layers/boxes.ts'
 import { type Box, localTo } from '../layers/transform.ts'
-import { type EditorSelection, idsOf, isPath } from '../selection.ts'
+import { type EditorSelection, idsOf, isPath, samePick } from '../selection.ts'
 import { inField } from '../shortcuts.ts'
 import { paragraphAt, wordAt } from '../text/text-edit.ts'
 import type { EditorTyping } from '../text/typing.ts'
@@ -274,7 +274,7 @@ export function editorPointer({
     const deepest = deepestAt(at)
     if (!deepest) return []
     const id = target(deepest.id, frame.id)
-    if (!selection.current()?.some((layer) => layer.frameId === frame.id && layer.id === id))
+    if (!selection.current()?.some((layer) => samePick(layer, { id, frameId: frame.id })))
       selection.select([id], frame.id)
     return idsOf(selection.current())
   }

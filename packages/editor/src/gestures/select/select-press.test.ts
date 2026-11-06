@@ -157,6 +157,13 @@ describe('editorSelectPress', () => {
       expect(selection.current()).toEqual(pairsIn('sq', ['box']))
     })
 
+    it('moves the copies a lock leaves free from a press, when another frame holds one locked in place', () => {
+      const { selection, pressIn, log } = harness(null, LOCKED_COPY)
+      selection.selectAcross([...pairsIn('sq', ['box']), ...pairsIn('tall', ['tall-box'])])
+      pressIn(SQUARE, { x: 650, y: 150 })
+      expect(log.at(-1)).toBe('press move box + tall: tall-box')
+    })
+
     it('selects alone the copy a click picked, in its own frame', () => {
       const { select, selection, pressIn } = harness(null, LINKED)
       selection.selectAcross([...pairsIn('sq', ['box']), ...pairsIn('tall', ['tall-box'])])

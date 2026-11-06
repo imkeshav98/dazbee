@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
+import type { Design } from '@dazbee/schema'
+
 import { idsOf, isPath, pairsIn } from './selection.ts'
 import { fakeDesign, frame, FRAMES, graphic, harness } from './test-selection.ts'
 

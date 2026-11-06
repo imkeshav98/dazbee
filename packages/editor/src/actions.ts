@@ -18,7 +18,7 @@ import { type EditorBoxes, visibleIn } from './layers/boxes.ts'
 import { hug as hugIn } from './layers/hug.ts'
 import { boundsOf, type Box, localTo, round } from './layers/transform.ts'
 import { runQuietly } from './run-quietly.ts'
-import { type EditorSelection, idsOf, isPath, type Picked } from './selection.ts'
+import { type EditorSelection, firstFrameOf, idsOf, isPath, pairsIn, type Picked } from './selection.ts'
 import { NUDGES, type ShortcutAction } from './shortcuts.ts'
 import type { EditorTools } from './tools.ts'
 
@@ -186,9 +186,10 @@ export function editorActions({
 
   /**
    * Runs a change on the selected layers of each frame that holds some, the first one's frame
-   * first, as one undo step: a frame where the change is refused is left as it is. `change` returns
-   * the layers to select in that frame, or null to leave the selection be; with any returned, they
-   * are selected across their frames. Returns whether the change ran in any frame.
+   * first, as one undo step: a frame where the change is refused is left as it is, its layers still
+   * selected. `change` returns the layers to select in that frame, or null to keep its selected
+   * layers; once any frame returns some, the selection becomes them across the frames. Returns
+   * whether the change ran in any frame.
    */
   function eachFrame(change: (frame: Frame, ids: string[], now: Design) => string[] | null) {
     const next: Picked[] = []
@@ -197,11 +198,10 @@ export function editorActions({
     session.gesture(() => {
       for (const { frame, ids } of boxes.rootsByFrame()) {
         let picked: string[] | null = null
-        if (!runQuietly(() => (picked = change(frame, ids, session.design())))) continue
-        ran = true
-        if (picked === null) continue
-        selects = true
-        next.push(...(picked as string[]).map((id) => ({ id, frameId: frame.id })))
+        const done = runQuietly(() => (picked = change(frame, ids, session.design())))
+        ran ||= done
+        selects ||= picked !== null
+        next.push(...pairsIn(frame.id, picked ?? ids))
       }
     })
     if (selects) selection.selectAcross(next)
@@ -299,7 +299,7 @@ export function editorActions({
    */
   function selectAll() {
     const frame =
-      frameOf(selection.current()?.[0]?.frameId) ??
+      frameOf(firstFrameOf(selection.current())) ??
       frameOf(selection.pickedFrame() ?? undefined) ??
       frameOf(selection.lastFrameOn(page()) ?? undefined) ??
       nearestFrame()
@@ -439,7 +439,7 @@ export function editorActions({
       case 'mask': {
         // One layer becomes a mask for the layers after it in its parent, or plain again; with one
         // layer selected in each of several frames, every one takes the first one's way. Several
-        // in a frame are grouped first, and the bottom one masks the rest (#48).
+        // in a frame are grouped first, and the bottom one masks the rest.
         const on = !nodes[boxes.roots()[0] ?? '']?.props.mask
         eachFrame((_, ids) => {
           if (ids.length === 1) {

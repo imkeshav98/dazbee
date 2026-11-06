@@ -126,6 +126,17 @@ describe('editorLayerEdits', () => {
       expect(copies()).toEqual(before)
     })
 
+    it('skips a layer locked against the change, still writing the rest, as one undo step', () => {
+      const { edits, session, props } = harness()
+      session.run('node.lock', { ids: ['dot'], lock: { move: true } })
+      expect(edits.setProps(['dot', 'wide-dot'], () => ({ y: 150, opacity: 0.5 }))).toBe(false)
+      expect(props('dot')).toMatchObject({ y: 100, opacity: 0.5 })
+      expect(props('wide-dot')).toMatchObject({ y: 150, opacity: 0.5 })
+      session.undo()
+      expect(props('wide-dot')).toMatchObject({ y: 100 })
+      expect(props('dot')?.opacity).toBe(1)
+    })
+
     it("gives the change each layer's own props", () => {
       const { edits, props } = harness()
       edits.setProps(['wide-dot'], () => ({ y: 150 }))

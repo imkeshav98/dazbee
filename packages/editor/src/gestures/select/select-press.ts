@@ -12,7 +12,7 @@ import { type Frame, frameAt } from '../../canvas/frames.ts'
 import type { EditorView } from '../../canvas/view.ts'
 import type { EditorBoxes } from '../../layers/boxes.ts'
 import { localTo } from '../../layers/transform.ts'
-import { type EditorSelection, firstFrameOf, type Picked } from '../../selection.ts'
+import { type EditorSelection, firstFrameOf, type Picked, samePick } from '../../selection.ts'
 import type { EditorTyping } from '../../text/typing.ts'
 import { CLICK_SLOP } from '../press.ts'
 import type { EditorAutoLayoutDrag, ReorderDrag } from './auto-layout-drag.ts'
@@ -120,7 +120,7 @@ export function editorSelectPress({
     // The box round the selected layers of the frame pressed in, which a press inside drags.
     const outer = boxes.selectionBoxes().find((b) => b.frame.id === at?.frame.id) ?? null
     const inSelection = (id: string) =>
-      Boolean(selection.current()?.some((layer) => layer.frameId === at?.frame.id && layer.id === id))
+      Boolean(at && selection.current()?.some((layer) => samePick(layer, { id, frameId: at.frame.id })))
     const locked = at && !e.shiftKey ? lockedAt(at.frame, at.p) : null
     // Inside the selection's box, a press moves the selection, gaps and layers over it included:
     // a mask, which isn't drawn, or a layer under others, is dragged where it is.

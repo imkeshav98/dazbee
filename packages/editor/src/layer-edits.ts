@@ -63,7 +63,9 @@ export function editorLayerEdits({ session, selection, resources, typing, signal
     ids: string[],
     to: (id: string, props: Readonly<Record<string, unknown>>) => Record<string, unknown> | null,
   ) {
-    return runQuietly(() =>
+    // Whether every layer took the whole change.
+    let allowed = true
+    const ran = runQuietly(() =>
       session.gesture(() => {
         const now = session.design()
         const placedProps = (id: string): Readonly<Record<string, unknown>> => now.nodes[id]?.props ?? {}
@@ -104,8 +106,12 @@ export function editorLayerEdits({ session, selection, resources, typing, signal
               ? ['fontFamily' as const]
               : []),
           ]
-          for (const target of unbind) session.run('node.bind', { ids: [id], target, ref: null })
-          session.run('node.update', { ids: [id], patch })
+          for (const target of unbind) runQuietly(() => session.run('node.bind', { ids: [id], target, ref: null }))
+          // A layer locked against part of the change takes the rest of it.
+          if (runQuietly(() => session.run('node.update', { ids: [id], patch }))) continue
+          allowed = false
+          for (const [key, value] of Object.entries(patch))
+            runQuietly(() => session.run('node.update', { ids: [id], patch: { [key]: value } }))
         }
         // Text that grows the size of its words fits them again.
         for (const [id, patch] of writes) {
@@ -114,6 +120,7 @@ export function editorLayerEdits({ session, selection, resources, typing, signal
         hug([...writes.keys()])
       }),
     )
+    return ran && allowed
   }
   const renameLayer = (id: string, name: string) => runQuietly(() => session.run('node.rename', { id, name }))
   const setLocked = (ids: string[], locked: boolean) =>
