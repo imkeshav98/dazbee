@@ -16,6 +16,7 @@ import {
   createContext,
   type FocusEvent,
   type KeyboardEvent,
+  type MouseEvent,
   type PointerEvent,
   type ReactElement,
   type ReactNode,
@@ -79,7 +80,7 @@ const ROOM = {
 
 const SharedContext = createContext<Shared | null>(null)
 
-/** The row a pointer is pressed on now, if one is. */
+/** The row the last press started on, or null when it started anywhere else. */
 let pressedRow: EventTarget | null = null
 /** Whether the last press was a key's rather than a pointer's, so a control focused now is reached by keyboard. */
 let keyed = false
@@ -88,9 +89,10 @@ let watching = false
 
 /**
  * A row's pointer handlers so that only a press that starts on the row runs it. Radix also runs the
- * row a pointer is let go over after a press elsewhere, as when the press that opened its menu
- * lands on the menu: on a phone the sheet covers its button, and a tap on the button would run the
- * row under the finger.
+ * row a pointer is let go over after a press elsewhere, and a phone sends a tap's click to what lies
+ * under the finger once the tap ends: either way the press that opened a menu would run the row
+ * the menu put under it, as on a phone, where the sheet covers its button. A click the keyboard
+ * makes (Enter on a row) comes from no press, and runs.
  */
 const PRESS = {
   onPointerDown: (event: PointerEvent<HTMLElement>) => {
@@ -98,7 +100,9 @@ const PRESS = {
   },
   onPointerUp: (event: PointerEvent<HTMLElement>) => {
     if (pressedRow !== event.currentTarget) event.preventDefault()
-    pressedRow = null
+  },
+  onClick: (event: MouseEvent<HTMLElement>) => {
+    if (event.detail > 0 && pressedRow !== event.currentTarget) event.preventDefault()
   },
 }
 
@@ -145,8 +149,8 @@ function useShared() {
 }
 
 /**
- * Has the page tell `keyed` whether each press is a key's or a pointer's, and end `pressedRow` with
- * each press, from the first menu on.
+ * Has the page tell `keyed` whether each press is a key's or a pointer's, and forget `pressedRow` as
+ * each press starts, from the first menu on.
  */
 function useWatchKeys() {
   useEffect(() => {
@@ -158,9 +162,14 @@ function useWatchKeys() {
       document.documentElement.dataset.input = byKey ? 'key' : 'pointer'
     }
     window.addEventListener('keydown', () => press(true), true)
-    window.addEventListener('pointerdown', () => press(false), true)
-    // A press let go anywhere ends, once the row it was let go over has had it.
-    window.addEventListener('pointerup', () => (pressedRow = null))
+    window.addEventListener(
+      'pointerdown',
+      () => {
+        press(false)
+        pressedRow = null
+      },
+      true,
+    )
   }, [])
 }
 

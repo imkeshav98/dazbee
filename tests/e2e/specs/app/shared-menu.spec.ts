@@ -315,10 +315,12 @@ test('on a touch phone a tap on ⋯ opens the sheet wherever ⋯ sits, and runs 
   expect(errors).toEqual([])
 })
 
+// A jump straight onto the menu, and a hand's sweep of small moves; Radix takes the direction a
+// pointer heads in from the moves inside the menu, so a sweep starts on the row it leaves.
 for (const [row, steps] of [
   ['copy', 1],
   ['copyStyle', 1],
-  ['copyStyle', 2],
+  ['copyStyle', 12],
 ] as const)
   test(`in Arabic a menu beside a row opened by a click takes a pointer moved onto its ${row} row in ${steps} step(s), and the row runs`, async ({
     browser,
