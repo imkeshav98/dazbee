@@ -285,23 +285,54 @@ export function ColorField({
         }}
         className={cn(FIELD, 'uppercase')}
       />
-      <div className="w-[4.5rem] shrink-0">
-        <NumberField
-          label=""
-          name={format(p.alpha, { name })}
-          value={opacity}
-          scale={100}
-          min={0}
-          max={1}
-          unit="%"
-          editor={editor}
-          testId="colour-opacity"
-          onSet={(to) => opacity !== undefined && onSet(alphaChange(to))}
-          onShift={(by) =>
-            opacity !== undefined && onSet((now) => alphaChange(clamp(percents(now || '#000000') + by, 0, 1))(now))
-          }
-        />
-      </div>
+      <OpacityField
+        name={format(p.alpha, { name })}
+        value={opacity}
+        editor={editor}
+        testId="colour-opacity"
+        onSet={(to) => opacity !== undefined && onSet(alphaChange(to))}
+        onShift={(by) =>
+          opacity !== undefined && onSet((now) => alphaChange(clamp(percents(now || '#000000') + by, 0, 1))(now))
+        }
+      />
+    </div>
+  )
+}
+
+/**
+ * An opacity as a percentage, its digits then %: a colour's beside its hex, and a paint's in its
+ * row of the fill list. `value` runs from 0 to 1.
+ */
+export function OpacityField({
+  name,
+  value,
+  editor,
+  testId,
+  onSet,
+  onShift,
+}: {
+  name: string
+  value: number | 'mixed' | undefined
+  editor?: Editor | undefined
+  testId?: string
+  onSet: (value: number) => void
+  onShift: (by: number) => void
+}) {
+  return (
+    <div className="w-[4.5rem] shrink-0">
+      <NumberField
+        label=""
+        name={name}
+        value={value}
+        scale={100}
+        min={0}
+        max={1}
+        unit="%"
+        editor={editor}
+        {...(testId ? { testId } : {})}
+        onSet={onSet}
+        onShift={onShift}
+      />
     </div>
   )
 }
